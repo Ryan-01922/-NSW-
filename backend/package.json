@@ -1,0 +1,50 @@
+{
+  "name": "nsw-land-registry",
+  "version": "1.0.0",
+  "description": "NSW Land Registry System on Ethereum",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "nodemon src/server.js",
+    "test": "mocha test/**/*.test.js --exit",
+    "lint": "eslint src/",
+    "migrate": "node scripts/migrate.js",
+    "seed": "node scripts/seed.js"
+  },
+  "dependencies": {
+    "compression": "^1.7.4",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "ethers": "^6.11.1",
+    "express": "^4.18.3",
+    "helmet": "^7.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "pg": "^8.11.3",
+    "web3.storage": "^4.5.5"
+  },
+  "devDependencies": {
+    "chai": "^4.3.10",
+    "chai-http": "^4.4.0",
+    "eslint": "^8.57.0",
+    "mocha": "^10.3.0",
+    "nodemon": "^3.1.0",
+    "sinon": "^17.0.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/nsw-land-registry.git"
+  },
+  "keywords": [
+    "ethereum",
+    "blockchain",
+    "land-registry",
+    "smart-contracts",
+    "real-estate"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}
