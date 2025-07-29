@@ -87,20 +87,23 @@ router.post('/renewals', async (req, res) => {
             return res.status(403).json({ error: 'Not authorized for this property' });
         }
 
-        // Create request
+        // Create request with auto-generated reason
+        const reason = `Property renewal extension for ${renewalPeriod} year(s)`;
         const result = await pool.query(`
             INSERT INTO renewal_requests (
                 folio_number,
                 requester_address,
                 new_expiry_date,
-                status
+                status,
+                reason
             ) VALUES (
                 $1,
                 $2,
                 CURRENT_TIMESTAMP + INTERVAL '1 year' * $3,
-                'pending'
+                'pending',
+                $4
             ) RETURNING *
-        `, [folioNumber, address, renewalPeriod]);
+        `, [folioNumber, address, renewalPeriod, reason]);
 
         res.json(result.rows[0]);
     } catch (error) {

@@ -73,9 +73,9 @@ export const agentAPI = {
   // Get renewal request list
   getRenewals: () => api.get('/api/agent/renewals'),
   // Get single renewal request details
-  getRenewal: (id) => api.get(`/api/renewals/${id}`),
+  getRenewal: (id) => api.get(`/api/agent/renewals/${id}`),
   // Create renewal request
-  createRenewal: (data) => api.post('/api/renewals', data),
+  createRenewal: (data) => api.post('/api/agent/renewals', data),
   // Cancel renewal request
   cancelRenewal: (id) => api.delete(`/api/renewals/${id}`),
   // Get transfer request list

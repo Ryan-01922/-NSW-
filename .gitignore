@@ -3,11 +3,7 @@ node_modules/
 /.pnp
 .pnp.js
 
-# Testing
-/coverage
-/test
-**/test/
-backend/test/
+/testdata
 
 # Production
 /build

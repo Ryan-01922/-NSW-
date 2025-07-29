@@ -84,10 +84,7 @@ const Renewal = () => {
 
       await agentAPI.createRenewal({
         folioNumber: selectedProperty.folio_number,
-        requesterAddress: selectedProperty.owner_address,
-        newExpiryDate: newExpiry.toISOString(),
-        reason: `Property renewal extension for ${renewalPeriod} year(s)`,
-        documents: [] // Empty documents array for renewal request
+        renewalPeriod: renewalPeriod
       });
 
       setOpenDialog(false);

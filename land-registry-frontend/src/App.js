@@ -12,6 +12,7 @@ import AgentDashboard from './pages/agent/Dashboard';
 import AgentProperty from './pages/agent/Property';
 import AgentPropertyDetail from './pages/agent/PropertyDetail';
 import AgentRenewal from './pages/agent/Renewal';
+import AgentRenewalDetail from './pages/agent/RenewalDetail';
 import AgentTransfer from './pages/agent/Transfer';
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminApprovals from './pages/admin/Approvals';
@@ -93,6 +94,14 @@ function App() {
               element={
                 <ProtectedRoute roles={['AGENT']}>
                   <AgentRenewal />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/agent/renewal/:id"
+              element={
+                <ProtectedRoute roles={['AGENT']}>
+                  <AgentRenewalDetail />
                 </ProtectedRoute>
               }
             />
