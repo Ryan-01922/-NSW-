@@ -14,6 +14,9 @@ import {
   Typography,
   Button,
   Divider,
+  Menu,
+  MenuItem,
+  Chip,
 } from '@mui/material';
 import {
   Menu as MenuIcon,
@@ -23,16 +26,19 @@ import {
   SwapHoriz as TransferIcon,
   Assignment as ApprovalsIcon,
   Logout as LogoutIcon,
+  AccountCircle,
+  KeyboardArrowDown,
 } from '@mui/icons-material';
 import { useAuth } from '../contexts/AuthContext';
 
 const drawerWidth = 240;
 
 const Layout = ({ children }) => {
-  const { account, roles, disconnect } = useAuth();
+  const { account, availableAccounts, roles, disconnect, switchAccount } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [mobileOpen, setMobileOpen] = React.useState(false);
+  const [accountMenuAnchor, setAccountMenuAnchor] = React.useState(null);
 
   const handleDrawerToggle = () => {
     setMobileOpen(!mobileOpen);
@@ -41,6 +47,39 @@ const Layout = ({ children }) => {
   const handleLogout = () => {
     disconnect();
     navigate('/login');
+  };
+
+  const handleAccountMenuOpen = (event) => {
+    setAccountMenuAnchor(event.currentTarget);
+  };
+
+  const handleAccountMenuClose = () => {
+    setAccountMenuAnchor(null);
+  };
+
+  const handleAccountSwitch = async (newAccount) => {
+    try {
+      // Show loading state could be added here
+      await switchAccount(newAccount);
+      handleAccountMenuClose();
+      // Refresh the page to update user data
+      window.location.reload();
+    } catch (error) {
+      console.error('Failed to switch account:', error);
+      handleAccountMenuClose();
+      
+      // Show user-friendly error message
+      if (error.message.includes('Please switch to account')) {
+        alert(`${error.message}\n\nSteps:\n1. Open MetaMask\n2. Select the account you want to use\n3. Try switching again`);
+      } else {
+        alert(`Failed to switch account: ${error.message}`);
+      }
+    }
+  };
+
+  // Format address for display
+  const formatAddress = (address) => {
+    return `${address?.slice(0, 6)}...${address?.slice(-4)}`;
   };
 
   // Get menu items based on role
@@ -126,9 +165,111 @@ const Layout = ({ children }) => {
             {roles.includes('AGENT') && 'Agent Dashboard'}
             {roles.includes('USER') && 'User Dashboard'}
           </Typography>
-          <Typography variant="body2" sx={{ mr: 2 }}>
-            {account?.slice(0, 6)}...{account?.slice(-4)}
+          
+          {/* Account Switcher */}
+          <Box sx={{ display: 'flex', alignItems: 'center', mr: 2 }}>
+            <Button
+              color="inherit"
+              onClick={handleAccountMenuOpen}
+              startIcon={<AccountCircle />}
+              endIcon={availableAccounts.length > 1 ? <KeyboardArrowDown /> : null}
+              sx={{
+                textTransform: 'none',
+                '&:hover': {
+                  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                }
+              }}
+            >
+              <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start' }}>
+                <Typography variant="body2" sx={{ fontSize: '0.875rem' }}>
+                  {formatAddress(account)}
+                </Typography>
+                {availableAccounts.length > 1 && (
+                  <Typography variant="caption" sx={{ fontSize: '0.75rem', opacity: 0.8 }}>
+                    {availableAccounts.length} accounts
+                  </Typography>
+                )}
+              </Box>
+            </Button>
+            
+            <Menu
+              anchorEl={accountMenuAnchor}
+              open={Boolean(accountMenuAnchor)}
+              onClose={handleAccountMenuClose}
+              PaperProps={{
+                sx: {
+                  mt: 1,
+                  minWidth: 280,
+                  maxHeight: 400,
+                  overflow: 'auto'
+                }
+              }}
+            >
+              <Box sx={{ px: 2, py: 1 }}>
+                <Typography variant="subtitle2" color="text.secondary">
+                  Available Accounts
+                </Typography>
+              </Box>
+              <Divider />
+              
+              {availableAccounts.map((availableAccount, index) => (
+                <MenuItem
+                  key={availableAccount}
+                  onClick={() => handleAccountSwitch(availableAccount)}
+                  disabled={availableAccount === account}
+                  sx={{
+                    px: 2,
+                    py: 1.5,
+                    '&.Mui-disabled': {
+                      backgroundColor: 'action.selected',
+                    }
+                  }}
+                >
+                  <ListItemIcon>
+                    <AccountCircle color={availableAccount === account ? 'primary' : 'inherit'} />
+                  </ListItemIcon>
+                  <ListItemText
+                    primary={
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography variant="body2">
+                          Account {index + 1}
+                        </Typography>
+                        {availableAccount === account && (
+                          <Chip
+                            label="Current"
+                            size="small"
+                            color="primary"
+                            variant="outlined"
+                          />
+                        )}
+                      </Box>
+                    }
+                    secondary={
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          fontFamily: 'monospace',
+                          fontSize: '0.75rem',
+                          color: 'text.secondary'
+                        }}
+                      >
+                        {availableAccount}
+                      </Typography>
+                    }
+                  />
+                </MenuItem>
+              ))}
+              
+              {availableAccounts.length <= 1 && (
+                <MenuItem disabled>
+                  <Typography variant="body2" color="text.secondary">
+                    No other accounts available
           </Typography>
+                </MenuItem>
+              )}
+            </Menu>
+          </Box>
+
           <Button color="inherit" onClick={handleLogout}>
             Logout
           </Button>

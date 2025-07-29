@@ -10,6 +10,7 @@ import UserDashboard from './pages/user/Dashboard';
 import UserProperty from './pages/user/Property';
 import AgentDashboard from './pages/agent/Dashboard';
 import AgentProperty from './pages/agent/Property';
+import AgentPropertyDetail from './pages/agent/PropertyDetail';
 import AgentRenewal from './pages/agent/Renewal';
 import AgentTransfer from './pages/agent/Transfer';
 import AdminDashboard from './pages/admin/Dashboard';
@@ -76,6 +77,14 @@ function App() {
               element={
                 <ProtectedRoute roles={['AGENT']}>
                   <AgentProperty />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/agent/property/:id"
+              element={
+                <ProtectedRoute roles={['AGENT']}>
+                  <AgentPropertyDetail />
                 </ProtectedRoute>
               }
             />

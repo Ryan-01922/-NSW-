@@ -1,9 +1,20 @@
-const { ethers } = require("ethers");
+const { ethers } = require('ethers');
+// Enter the private key from your config file here
+const privateKey = process.env.PRIVATE_KEY || 'your_private_key_here';
 
-// 这里填入您配置文件中的私钥
-const privateKey = "a3cd714cf7442c5fcb6d37ae1d32a94ac2bd2e176312bbc3223c62f0aab548bb";
-
-// 从私钥创建钱包
+// Create wallet from private key
 const wallet = new ethers.Wallet(privateKey);
-console.log("Private key:", privateKey);
-console.log("Corresponding address:", wallet.address); 
+
+console.log('Ethereum Address:', wallet.address);
+console.log('Private Key:', privateKey);
+
+// Verify address format
+if (ethers.utils.isAddress(wallet.address)) {
+    console.log('Address format is valid');
+} else {
+    console.log('Address format is invalid');
+}
+
+// Display address info
+console.log('Address length:', wallet.address.length);
+console.log('Starts with 0x:', wallet.address.startsWith('0x')); 

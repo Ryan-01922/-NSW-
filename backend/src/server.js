@@ -6,6 +6,7 @@ const helmet = require('helmet');
 const compression = require('compression');
 
 const { verifyToken } = require('./middleware/auth');
+// Import route modules
 const authRoutes = require('./routes/auth');
 const adminRoutes = require('./routes/admin');
 const agentRoutes = require('./routes/agent');
@@ -13,6 +14,7 @@ const userRoutes = require('./routes/user');
 const propertyRoutes = require('./routes/property');
 const renewalRoutes = require('./routes/renewal');
 const transferRoutes = require('./routes/transfer');
+const ipfsRoutes = require('./routes/ipfs');
 const { startEventListeners } = require('./services/eventListener');
 
 const app = express();
@@ -45,6 +47,7 @@ app.use('/api/user', verifyToken, userRoutes);
 app.use('/api/properties', verifyToken, propertyRoutes);
 app.use('/api/renewals', verifyToken, renewalRoutes);
 app.use('/api/transfers', verifyToken, transferRoutes);
+app.use('/api/ipfs', verifyToken, ipfsRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

@@ -14,21 +14,22 @@ contract RenewalApproval is AccessControl {
         string folioNumber;
         address requester;
         uint256 requestTime;
-        bool approved;
         uint256 newExpiryTime;
+        bool approved;
         string reason;
+        string documents; // IPFS hash for storing renewal-related files
     }
 
-    // 存储续期请求
+    // Store renewal requests
     mapping(string => RenewalRequest) public renewalRequests;
-    // 追踪每个房产的续期历史
+    // Track renewal history for each property
     mapping(string => RenewalRequest[]) public renewalHistory;
 
     event RenewalRequested(
         string folioNumber,
         address requester,
         uint256 requestTime,
-        uint256 proposedExpiryTime
+        uint256 newExpiryTime
     );
     event RenewalApproved(string folioNumber, uint256 newExpiryTime);
     event RenewalRejected(string folioNumber, string reason);
@@ -39,38 +40,41 @@ contract RenewalApproval is AccessControl {
         _grantRole(ADMIN_ROLE, msg.sender);
     }
 
-    // 代理人发起续期请求
+    // Agent initiates renewal request
     function requestRenewal(
         string memory folioNumber,
-        uint256 proposedExpiryTime,
-        string memory reason
+        uint256 newExpiryTime,
+        string memory reason,
+        string memory documents
     ) public onlyRole(AGENT_ROLE) {
-        // 验证房产存在且处于活跃状态
-        (,,,bool active) = landRegistry.getProperty(folioNumber);
+        // Verify property exists and is active
+        (,, uint256 currentExpiry, bool active) = landRegistry.getProperty(folioNumber);
         require(active, "Property not active");
         
-        // 验证新的到期时间合理性
-        require(proposedExpiryTime > block.timestamp, "Invalid expiry time");
+        // Verify new expiry time is reasonable
+        require(newExpiryTime > block.timestamp, "New expiry time must be in the future");
+        require(newExpiryTime > currentExpiry, "New expiry time must be later than current expiry");
 
-        // 创建续期请求
+        // Create renewal request
         renewalRequests[folioNumber] = RenewalRequest({
             folioNumber: folioNumber,
             requester: msg.sender,
             requestTime: block.timestamp,
+            newExpiryTime: newExpiryTime,
             approved: false,
-            newExpiryTime: proposedExpiryTime,
-            reason: reason
+            reason: reason,
+            documents: documents
         });
 
         emit RenewalRequested(
             folioNumber,
             msg.sender,
             block.timestamp,
-            proposedExpiryTime
+            newExpiryTime
         );
     }
 
-    // 管理员审批续期请求
+    // Admin approves renewal request
     function approveRenewal(
         string memory folioNumber,
         bool approved,
@@ -81,7 +85,7 @@ contract RenewalApproval is AccessControl {
         require(!request.approved, "Request already processed");
 
         if (approved) {
-            // 更新土地登记合约中的到期时间
+            // Update expiry time in land registry contract
             landRegistry.approveRenewal(folioNumber, request.newExpiryTime);
             request.approved = true;
             emit RenewalApproved(folioNumber, request.newExpiryTime);
@@ -89,40 +93,52 @@ contract RenewalApproval is AccessControl {
             emit RenewalRejected(folioNumber, rejectionReason);
         }
 
-        // 添加到历史记录
+        // Add to history
         renewalHistory[folioNumber].push(request);
         
-        // 如果被拒绝，清除当前请求
+        // If rejected, clear current request
         if (!approved) {
             delete renewalRequests[folioNumber];
         }
     }
 
-    // 查询续期请求
-    function getRenewalRequest(string memory folioNumber) 
+    // Query renewal request
+    function getRenewalRequest(string memory folioNumber)
         public view returns (
             address requester,
             uint256 requestTime,
-            bool approved,
             uint256 newExpiryTime,
-            string memory reason
-        ) 
+            bool approved,
+            string memory reason,
+            string memory documents
+        )
     {
         RenewalRequest memory request = renewalRequests[folioNumber];
         require(request.requester != address(0), "No renewal request found");
         return (
             request.requester,
             request.requestTime,
-            request.approved,
             request.newExpiryTime,
-            request.reason
+            request.approved,
+            request.reason,
+            request.documents
         );
     }
 
-    // 获取续期历史
+    // Get renewal history
     function getRenewalHistory(string memory folioNumber)
         public view returns (RenewalRequest[] memory)
     {
         return renewalHistory[folioNumber];
+    }
+
+    // Cancel renewal request (only requester can cancel)
+    function cancelRenewalRequest(string memory folioNumber) public {
+        RenewalRequest storage request = renewalRequests[folioNumber];
+        require(request.requester != address(0), "No pending renewal request");
+        require(msg.sender == request.requester, "Not authorized to cancel");
+        require(!request.approved, "Request already approved");
+
+        delete renewalRequests[folioNumber];
     }
 } 

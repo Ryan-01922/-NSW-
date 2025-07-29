@@ -2,7 +2,6 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../config/database');
 const { verifyToken, verifyRole } = require('../middleware/auth');
-const { uploadToIPFS } = require('../utils/ipfs');
 const { contracts } = require('../config/contracts');
 const { validateEthAddress, validateIPFSHash } = require('../utils/validation');
 
@@ -77,7 +76,8 @@ router.post('/', verifyToken, verifyRole(['AGENT', 'ADMIN']), async (req, res) =
             areaSize,
             ownerAddress,
             expiryDate,
-            documents
+            documents,
+            metadata
         } = req.body;
 
         // Validation
@@ -85,10 +85,18 @@ router.post('/', verifyToken, verifyRole(['AGENT', 'ADMIN']), async (req, res) =
             return res.status(400).json({ error: 'Invalid owner address format' });
         }
 
-        // Upload documents to IPFS
-        const ipfsHash = await uploadToIPFS(documents);
-        if (!validateIPFSHash(ipfsHash)) {
-            return res.status(400).json({ error: 'Invalid IPFS hash' });
+        if (!folioNumber || !locationHash || !areaSize || !ownerAddress || !expiryDate) {
+            return res.status(400).json({ error: 'Missing required fields' });
+        }
+
+        if (!documents || !Array.isArray(documents) || documents.length === 0) {
+            return res.status(400).json({ error: 'No documents provided' });
+        }
+
+        // Use the main document CID (deed) as the primary IPFS hash
+        const mainDocumentCID = documents.find(doc => doc.type === 'deed')?.cid;
+        if (!mainDocumentCID) {
+            return res.status(400).json({ error: 'Deed document is required' });
         }
 
         // Start transaction
@@ -113,26 +121,45 @@ router.post('/', verifyToken, verifyRole(['AGENT', 'ADMIN']), async (req, res) =
             areaSize,
             ownerAddress,
             expiryDate,
-            ipfsHash,
-            { documents: documents.map(doc => doc.name) }
+            mainDocumentCID,
+            { 
+                ...metadata,
+                documents: documents,
+                registeredBy: req.user.address,
+                registeredAt: new Date().toISOString()
+            }
         ]);
 
         // Register property on blockchain
         const tx = await contracts.landRegistry.registerProperty(
             folioNumber,
-            locationHash,
             ownerAddress,
-            Math.floor(new Date(expiryDate).getTime() / 1000),
-            ipfsHash
+            mainDocumentCID,
+            Math.floor(new Date(expiryDate).getTime() / 1000)
         );
         await tx.wait();
 
+        // Update status to active after successful blockchain registration
+        await client.query(`
+            UPDATE properties 
+            SET status = 'active' 
+            WHERE folio_number = $1
+        `, [folioNumber]);
+
+        // Get updated property data
+        const updatedResult = await client.query(`
+            SELECT * FROM properties WHERE folio_number = $1
+        `, [folioNumber]);
+
         await client.query('COMMIT');
-        res.status(201).json(result.rows[0]);
+        res.status(201).json(updatedResult.rows[0]);
     } catch (error) {
         await client.query('ROLLBACK');
         console.error('Error registering property:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ 
+            error: 'Internal server error',
+            details: error.message 
+        });
     } finally {
         client.release();
     }

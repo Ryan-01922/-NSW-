@@ -11,7 +11,11 @@ export const isValidAddress = (address) => {
 
 // Validate property ID
 export const isValidFolioNumber = (folioNumber) => {
-  return /^[A-Z0-9]{6,10}$/.test(folioNumber);
+  // Format: NSW-XXX-YYYY-NNN where:
+  // XXX is a 3-letter location code
+  // YYYY is a 4-digit year  
+  // NNN is a 3-digit sequence number
+  return /^NSW-[A-Z]{3}-\d{4}-\d{3}$/.test(folioNumber);
 };
 
 // Validate renewal period

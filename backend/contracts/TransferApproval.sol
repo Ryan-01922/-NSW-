@@ -18,12 +18,12 @@ contract TransferApproval is AccessControl {
         uint256 requestTime;
         bool approved;
         string reason;
-        string documents; // IPFS哈希，存储转移相关文件
+        string documents; // IPFS hash for storing transfer-related files
     }
 
-    // 存储转移请求
+    // Store transfer requests
     mapping(string => TransferRequest) public transferRequests;
-    // 追踪每个房产的转移历史
+    // Track transfer history for each property
     mapping(string => TransferRequest[]) public transferHistory;
 
     event TransferRequested(
@@ -42,23 +42,23 @@ contract TransferApproval is AccessControl {
         _grantRole(ADMIN_ROLE, msg.sender);
     }
 
-    // 代理人发起转移请求
+    // Agent initiates transfer request
     function requestTransfer(
         string memory folioNumber,
         address newOwner,
         string memory reason,
         string memory documents
     ) public onlyRole(AGENT_ROLE) {
-        // 验证房产状态
+        // Verify property status
         (address currentOwner,,,bool active) = landRegistry.getProperty(folioNumber);
         require(active, "Property not active");
         require(newOwner != address(0), "Invalid new owner address");
         require(newOwner != currentOwner, "New owner same as current owner");
 
-        // 验证是否有待处理的请求
+        // Verify no pending requests exist
         require(transferRequests[folioNumber].requester == address(0), "Transfer already pending");
 
-        // 创建转移请求
+        // Create transfer request
         transferRequests[folioNumber] = TransferRequest({
             folioNumber: folioNumber,
             from: currentOwner,
@@ -79,7 +79,7 @@ contract TransferApproval is AccessControl {
         );
     }
 
-    // 管理员审批转移请求
+    // Admin approves transfer request
     function approveTransfer(
         string memory folioNumber,
         bool approved,
@@ -90,7 +90,7 @@ contract TransferApproval is AccessControl {
         require(!request.approved, "Request already processed");
 
         if (approved) {
-            // 在主合约中执行转移
+            // Execute transfer in main contract
             landRegistry.approveTransfer(folioNumber);
             request.approved = true;
             emit TransferApproved(folioNumber, request.from, request.to);
@@ -98,16 +98,16 @@ contract TransferApproval is AccessControl {
             emit TransferRejected(folioNumber, rejectionReason);
         }
 
-        // 添加到历史记录
+        // Add to history
         transferHistory[folioNumber].push(request);
         
-        // 如果被拒绝，清除当前请求
+        // If rejected, clear current request
         if (!approved) {
             delete transferRequests[folioNumber];
         }
     }
 
-    // 查询转移请求
+    // Query transfer request
     function getTransferRequest(string memory folioNumber)
         public view returns (
             address from,
@@ -132,14 +132,14 @@ contract TransferApproval is AccessControl {
         );
     }
 
-    // 获取转移历史
+    // Get transfer history
     function getTransferHistory(string memory folioNumber)
         public view returns (TransferRequest[] memory)
     {
         return transferHistory[folioNumber];
     }
 
-    // 取消转移请求（仅限请求发起者或当前所有者）
+    // Cancel transfer request (only requester or current owner can cancel)
     function cancelTransferRequest(string memory folioNumber) public {
         TransferRequest storage request = transferRequests[folioNumber];
         require(request.requester != address(0), "No pending transfer request");

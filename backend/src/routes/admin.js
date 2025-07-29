@@ -2,9 +2,115 @@ const express = require('express');
 const router = express.Router();
 const { pool } = require('../config/database');
 const { verifyRole } = require('../middleware/auth');
+const { validateEthAddress } = require('../utils/validation');
 
 // Apply admin role verification to all routes
 router.use(verifyRole(['ADMIN']));
+
+// Authorize user as agent (global agent permission)
+router.post('/agents', async (req, res) => {
+    try {
+        const { agentAddress, remarks } = req.body;
+        
+        // Validate address
+        if (!validateEthAddress(agentAddress)) {
+            return res.status(400).json({ error: 'Invalid Ethereum address' });
+        }
+
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            // Check if already a global agent
+            const existing = await client.query(`
+                SELECT * FROM global_agents 
+                WHERE LOWER(agent_address) = LOWER($1) AND is_active = true
+            `, [agentAddress]);
+
+            if (existing.rows.length > 0) {
+                await client.query('ROLLBACK');
+                return res.status(400).json({ error: 'User is already authorized as an agent' });
+            }
+
+            // Create global agent authorization
+            const result = await client.query(`
+                INSERT INTO global_agents (
+                    agent_address, 
+                    authorized_by, 
+                    is_active,
+                    metadata
+                ) VALUES ($1, $2, true, $3)
+                RETURNING *
+            `, [agentAddress, req.user.address, JSON.stringify({ remarks, type: 'global_agent' })]);
+
+            await client.query('COMMIT');
+            res.status(201).json({
+                message: 'User successfully authorized as agent',
+                authorization: result.rows[0]
+            });
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
+        }
+    } catch (error) {
+        console.error('Failed to authorize agent:', error);
+        res.status(500).json({ error: 'Failed to authorize agent' });
+    }
+});
+
+// Get all authorized agents
+router.get('/agents', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT 
+                agent_address,
+                authorized_by,
+                authorized_at,
+                metadata,
+                created_at,
+                is_active
+            FROM global_agents 
+            ORDER BY created_at DESC
+        `);
+
+        res.json(result.rows);
+    } catch (error) {
+        console.error('Failed to get agents:', error);
+        res.status(500).json({ error: 'Failed to get agents' });
+    }
+});
+
+// Revoke agent authorization
+router.delete('/agents/:address', async (req, res) => {
+    try {
+        const { address } = req.params;
+        
+        if (!validateEthAddress(address)) {
+            return res.status(400).json({ error: 'Invalid Ethereum address' });
+        }
+
+        const result = await pool.query(`
+            UPDATE global_agents 
+            SET is_active = false, updated_at = CURRENT_TIMESTAMP
+            WHERE LOWER(agent_address) = LOWER($1) AND is_active = true
+            RETURNING *
+        `, [address]);
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: 'Agent authorization not found' });
+        }
+
+        res.json({
+            message: 'Agent authorization revoked successfully',
+            authorization: result.rows[0]
+        });
+    } catch (error) {
+        console.error('Failed to revoke agent:', error);
+        res.status(500).json({ error: 'Failed to revoke agent authorization' });
+    }
+});
 
 // Get system statistics
 router.get('/stats', async (req, res) => {
@@ -26,8 +132,14 @@ router.get('/stats', async (req, res) => {
                 client.query("SELECT COUNT(*) as count FROM properties WHERE status = 'active'"),
                 client.query("SELECT COUNT(*) as count FROM renewal_requests WHERE status = 'pending'"),
                 client.query("SELECT COUNT(*) as count FROM ownership_transfers WHERE status = 'pending'"),
-                client.query('SELECT COUNT(DISTINCT owner_address) as count FROM properties'),
-                client.query('SELECT COUNT(DISTINCT agent_address) as count FROM agent_authorization WHERE is_active = true')
+                client.query('SELECT COUNT(*) as count FROM users'),
+                client.query(`
+                    SELECT COUNT(DISTINCT agent_address) as count FROM (
+                        SELECT agent_address FROM agent_authorization WHERE is_active = true
+                        UNION
+                        SELECT agent_address FROM global_agents WHERE is_active = true
+                    ) AS all_agents
+                `)
             ]);
 
             await client.query('COMMIT');

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
 import {
   Box,
   Grid,
@@ -7,50 +6,63 @@ import {
   CardContent,
   Typography,
   Button,
-  Paper,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  TextField,
   Alert,
+  CircularProgress,
+  List,
+  ListItem,
+  ListItemText,
+  ListItemSecondaryAction,
+  IconButton,
+  Tabs,
+  Tab,
+  Chip,
 } from '@mui/material';
-import {
-  Refresh as RenewalIcon,
-  SwapHoriz as TransferIcon,
-} from '@mui/icons-material';
+import { Add as AddIcon, Delete as DeleteIcon, Person as PersonIcon } from '@mui/icons-material';
 import Layout from '../../components/Layout';
-import StatusChip from '../../components/StatusChip';
-import AddressDisplay from '../../components/AddressDisplay';
 import { adminAPI } from '../../services/api';
-import { formatDate, formatDateTime } from '../../utils/format';
+import { isValidAddress } from '../../utils/validation';
 
-const Dashboard = () => {
-  const navigate = useNavigate();
-  const [stats, setStats] = useState({
-    totalProperties: 0,
-    pendingRenewals: 0,
-    pendingTransfers: 0,
-    totalUsers: 0,
-    totalAgents: 0,
-  });
-  const [recentActivities, setRecentActivities] = useState([]);
+const TabPanel = ({ children, value, index, ...other }) => (
+  <div role="tabpanel" hidden={value !== index} {...other}>
+    {value === index && <Box sx={{ p: 3 }}>{children}</Box>}
+  </div>
+);
+
+const AdminDashboard = () => {
+  const [stats, setStats] = useState({});
+  const [agents, setAgents] = useState([]);
+  const [pendingRenewals, setPendingRenewals] = useState([]);
+  const [pendingTransfers, setPendingTransfers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [tabValue, setTabValue] = useState(0);
+  
+  // Agent authorization dialog state
+  const [openAgentDialog, setOpenAgentDialog] = useState(false);
+  const [agentAddress, setAgentAddress] = useState('');
+  const [agentRemarks, setAgentRemarks] = useState('');
+  const [authorizing, setAuthorizing] = useState(false);
 
-  // Fetch statistics and recent activities
+  // Fetch all data
   const fetchData = async () => {
     try {
       setLoading(true);
-      setError(null);
-      const [statsData, activitiesData] = await Promise.all([
+      const [statsData, agentsData, renewalsData, transfersData] = await Promise.all([
         adminAPI.getStats(),
-        adminAPI.getActivities()
+        adminAPI.getAgents(),
+        adminAPI.getPendingRenewals(),
+        adminAPI.getPendingTransfers()
       ]);
+      
       setStats(statsData);
-      setRecentActivities(activitiesData);
+      setAgents(agentsData);
+      setPendingRenewals(renewalsData);
+      setPendingTransfers(transfersData);
     } catch (err) {
       setError(err.message || 'Failed to fetch data');
     } finally {
@@ -60,10 +72,67 @@ const Dashboard = () => {
 
   useEffect(() => {
     fetchData();
-    // Set refresh interval
-    const interval = setInterval(fetchData, 30000); // Refresh every 30 seconds
-    return () => clearInterval(interval);
   }, []);
+
+  // Authorize new agent
+  const handleAuthorizeAgent = async () => {
+    try {
+      if (!isValidAddress(agentAddress)) {
+        throw new Error('Invalid Ethereum address');
+      }
+
+      setAuthorizing(true);
+      await adminAPI.authorizeAgent({
+        agentAddress,
+        remarks: agentRemarks
+      });
+
+      setOpenAgentDialog(false);
+      setAgentAddress('');
+      setAgentRemarks('');
+      fetchData(); // Refresh data
+    } catch (err) {
+      setError(err.message || 'Failed to authorize agent');
+    } finally {
+      setAuthorizing(false);
+    }
+  };
+
+  // Revoke agent authorization
+  const handleRevokeAgent = async (address) => {
+    try {
+      await adminAPI.revokeAgent(address);
+      fetchData(); // Refresh data
+    } catch (err) {
+      setError(err.message || 'Failed to revoke agent');
+    }
+  };
+
+  // Handle renewal approval
+  const handleRenewal = async (id, approved) => {
+    try {
+      await adminAPI.handleRenewal(id, { 
+        approved, 
+        remarks: approved ? 'Approved by admin' : 'Rejected by admin' 
+      });
+      fetchData(); // Refresh data
+    } catch (err) {
+      setError(err.message || 'Failed to handle renewal');
+    }
+  };
+
+  // Handle transfer approval
+  const handleTransfer = async (id, approved) => {
+    try {
+      await adminAPI.handleTransfer(id, { 
+        approved, 
+        remarks: approved ? 'Approved by admin' : 'Rejected by admin' 
+      });
+      fetchData(); // Refresh data
+    } catch (err) {
+      setError(err.message || 'Failed to handle transfer');
+    }
+  };
 
   if (loading) {
     return (
@@ -81,200 +150,292 @@ const Dashboard = () => {
         <Typography variant="h4" gutterBottom>
           Admin Dashboard
         </Typography>
-      </Box>
 
-      {error && (
-        <Alert severity="error" sx={{ mb: 2 }}>
-          {error}
-        </Alert>
-      )}
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError(null)}>
+            {error}
+          </Alert>
+        )}
 
-      {/* Statistics Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={4}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Total Properties
-              </Typography>
-              <Typography variant="h3">
-                {stats.totalProperties}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={4}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Pending Renewals
-              </Typography>
-              <Typography variant="h3" color="warning.main">
-                {stats.pendingRenewals}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={4}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Pending Transfers
-              </Typography>
-              <Typography variant="h3" color="warning.main">
-                {stats.pendingTransfers}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Total Users
-              </Typography>
-              <Typography variant="h3">
-                {stats.totalUsers}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-        <Grid item xs={12} sm={6}>
-          <Card>
-            <CardContent>
-              <Typography color="textSecondary" gutterBottom>
-                Total Agents
-              </Typography>
-              <Typography variant="h3">
-                {stats.totalAgents}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
-
-      {/* Quick Action Buttons */}
-      <Box sx={{ mb: 4 }}>
-        <Grid container spacing={2}>
-          <Grid item>
-            <Button
-              variant="contained"
-              startIcon={<RenewalIcon />}
-              onClick={() => navigate('/admin/approvals', { state: { tab: 0 } })}
-              color={stats.pendingRenewals > 0 ? 'warning' : 'primary'}
-            >
-              Renewal Approvals
-              {stats.pendingRenewals > 0 && (
-                <Box
-                  component="span"
-                  sx={{
-                    ml: 1,
-                    px: 1,
-                    py: 0.5,
-                    borderRadius: 1,
-                    bgcolor: 'error.main',
-                    color: 'white',
-                    fontSize: '0.75rem',
-                  }}
-                >
-                  {stats.pendingRenewals}
-                </Box>
-              )}
-            </Button>
+        {/* Statistics Cards */}
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card>
+              <CardContent>
+                <Typography color="textSecondary" gutterBottom>
+                  Total Properties
+                </Typography>
+                <Typography variant="h4">
+                  {stats.totalProperties || 0}
+                </Typography>
+              </CardContent>
+            </Card>
           </Grid>
-          <Grid item>
-            <Button
-              variant="contained"
-              startIcon={<TransferIcon />}
-              onClick={() => navigate('/admin/approvals', { state: { tab: 1 } })}
-              color={stats.pendingTransfers > 0 ? 'warning' : 'primary'}
-            >
-              Transfer Approvals
-              {stats.pendingTransfers > 0 && (
-                <Box
-                  component="span"
-                  sx={{
-                    ml: 1,
-                    px: 1,
-                    py: 0.5,
-                    borderRadius: 1,
-                    bgcolor: 'error.main',
-                    color: 'white',
-                    fontSize: '0.75rem',
-                  }}
-                >
-                  {stats.pendingTransfers}
-                </Box>
-              )}
-            </Button>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card>
+              <CardContent>
+                <Typography color="textSecondary" gutterBottom>
+                  Active Properties
+                </Typography>
+                <Typography variant="h4">
+                  {stats.activeProperties || 0}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card>
+              <CardContent>
+                <Typography color="textSecondary" gutterBottom>
+                  Total Agents
+                </Typography>
+                <Typography variant="h4">
+                  {stats.totalAgents || 0}
+                </Typography>
+              </CardContent>
+            </Card>
+          </Grid>
+          <Grid item xs={12} sm={6} md={3}>
+            <Card>
+              <CardContent>
+                <Typography color="textSecondary" gutterBottom>
+                  Pending Requests
+                </Typography>
+                <Typography variant="h4">
+                  {(stats.pendingRenewals || 0) + (stats.pendingTransfers || 0)}
+                </Typography>
+              </CardContent>
+            </Card>
           </Grid>
         </Grid>
+
+        {/* Tabs for different sections */}
+        <Card>
+          <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+            <Tabs value={tabValue} onChange={(e, newValue) => setTabValue(newValue)}>
+              <Tab label={`Agent Management (${agents.length})`} />
+              <Tab label={`Pending Renewals (${pendingRenewals.length})`} />
+              <Tab label={`Pending Transfers (${pendingTransfers.length})`} />
+            </Tabs>
+          </Box>
+
+          {/* Agent Management Tab */}
+          <TabPanel value={tabValue} index={0}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+              <Typography variant="h6">Authorized Agents</Typography>
+              <Button
+                variant="contained"
+                startIcon={<AddIcon />}
+                onClick={() => setOpenAgentDialog(true)}
+              >
+                Authorize New Agent
+              </Button>
+            </Box>
+
+            {agents.length === 0 ? (
+              <Typography color="textSecondary">No agents authorized yet</Typography>
+            ) : (
+              <List>
+                {agents.map((agent) => (
+                  <ListItem key={agent.agent_address} divider>
+                    <ListItemText
+                      primary={
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                          <PersonIcon color="primary" />
+                          <Typography variant="body1" sx={{ fontFamily: 'monospace' }}>
+                            {agent.agent_address}
+                          </Typography>
+                          <Chip 
+                            label={agent.is_active ? 'Active' : 'Inactive'} 
+                            color={agent.is_active ? 'success' : 'default'}
+                            size="small"
+                          />
+                        </Box>
+                      }
+                      secondary={
+                        <>
+                          <Typography variant="body2" color="textSecondary">
+                            Authorized by: {agent.authorized_by ? `${agent.authorized_by.slice(0, 6)}...${agent.authorized_by.slice(-4)}` : 'Unknown'}
+                          </Typography>
+                          <Typography variant="body2" color="textSecondary">
+                            Authorized at: {agent.authorized_at ? new Date(agent.authorized_at).toLocaleDateString() : new Date(agent.created_at).toLocaleDateString()}
+                          </Typography>
+                          {agent.metadata?.remarks && (
+                            <Typography variant="body2" color="textSecondary">
+                              Remarks: {agent.metadata.remarks}
+                            </Typography>
+                          )}
+                        </>
+                      }
+                    />
+                    {agent.is_active && (
+                      <ListItemSecondaryAction>
+                        <IconButton 
+                          edge="end" 
+                          color="error"
+                          onClick={() => handleRevokeAgent(agent.agent_address)}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </ListItemSecondaryAction>
+                    )}
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </TabPanel>
+
+          {/* Pending Renewals Tab */}
+          <TabPanel value={tabValue} index={1}>
+            <Typography variant="h6" sx={{ mb: 2 }}>Pending Renewal Requests</Typography>
+            
+            {pendingRenewals.length === 0 ? (
+              <Typography color="textSecondary">No pending renewal requests</Typography>
+            ) : (
+              <List>
+                {pendingRenewals.map((renewal) => (
+                  <ListItem key={renewal.id} divider>
+                    <ListItemText
+                      primary={`Property ${renewal.folio_number}`}
+                      secondary={
+                        <>
+                          <Typography variant="body2">
+                            Requested by: {renewal.requester_address}
+                          </Typography>
+                          <Typography variant="body2">
+                            New expiry: {new Date(renewal.new_expiry_date).toLocaleDateString()}
+                          </Typography>
+                          <Typography variant="body2">
+                            Reason: {renewal.reason}
+                          </Typography>
+                        </>
+                      }
+                    />
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Button
+                        variant="contained"
+                        color="success"
+                        size="small"
+                        onClick={() => handleRenewal(renewal.id, true)}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        size="small"
+                        onClick={() => handleRenewal(renewal.id, false)}
+                      >
+                        Reject
+                      </Button>
+                    </Box>
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </TabPanel>
+
+          {/* Pending Transfers Tab */}
+          <TabPanel value={tabValue} index={2}>
+            <Typography variant="h6" sx={{ mb: 2 }}>Pending Transfer Requests</Typography>
+            
+            {pendingTransfers.length === 0 ? (
+              <Typography color="textSecondary">No pending transfer requests</Typography>
+            ) : (
+              <List>
+                {pendingTransfers.map((transfer) => (
+                  <ListItem key={transfer.id} divider>
+                    <ListItemText
+                      primary={`Property ${transfer.folio_number}`}
+                      secondary={
+                        <>
+                          <Typography variant="body2">
+                            From: {transfer.from_address}
+                          </Typography>
+                          <Typography variant="body2">
+                            To: {transfer.to_address}
+                          </Typography>
+                          <Typography variant="body2">
+                            Current Owner: {transfer.current_owner_address}
+                          </Typography>
+                        </>
+                      }
+                    />
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <Button
+                        variant="contained"
+                        color="success"
+                        size="small"
+                        onClick={() => handleTransfer(transfer.id, true)}
+                      >
+                        Approve
+                      </Button>
+                      <Button
+                        variant="outlined"
+                        color="error"
+                        size="small"
+                        onClick={() => handleTransfer(transfer.id, false)}
+                      >
+                        Reject
+                      </Button>
+                    </Box>
+                  </ListItem>
+                ))}
+              </List>
+            )}
+          </TabPanel>
+        </Card>
       </Box>
 
-      {/* Recent Activities */}
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h6" gutterBottom sx={{ display: 'flex', alignItems: 'center' }}>
-          Recent Activities
-          <Button
-            size="small"
-            startIcon={<RenewalIcon />}
-            onClick={fetchData}
-            sx={{ ml: 2 }}
+      {/* Authorize Agent Dialog */}
+      <Dialog open={openAgentDialog} onClose={() => setOpenAgentDialog(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>Authorize New Agent</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ mb: 3 }}>
+            Grant a user permission to act as a property agent.
+          </Typography>
+          
+          <TextField
+            autoFocus
+            margin="dense"
+            label="Agent Ethereum Address"
+            type="text"
+            fullWidth
+            variant="outlined"
+            value={agentAddress}
+            onChange={(e) => setAgentAddress(e.target.value)}
+            placeholder="0x..."
+            error={agentAddress && !isValidAddress(agentAddress)}
+            helperText={agentAddress && !isValidAddress(agentAddress) ? 'Invalid Ethereum address' : ''}
+            sx={{ mb: 2 }}
+          />
+
+          <TextField
+            margin="dense"
+            label="Remarks (Optional)"
+            type="text"
+            fullWidth
+            variant="outlined"
+            multiline
+            rows={3}
+            value={agentRemarks}
+            onChange={(e) => setAgentRemarks(e.target.value)}
+            placeholder="Add any notes about this agent authorization..."
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenAgentDialog(false)}>Cancel</Button>
+          <Button 
+            onClick={handleAuthorizeAgent} 
+            variant="contained"
+            disabled={authorizing || !isValidAddress(agentAddress)}
           >
-            Refresh
+            {authorizing ? <CircularProgress size={20} /> : 'Authorize'}
           </Button>
-        </Typography>
-        <TableContainer component={Paper}>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Time</TableCell>
-                <TableCell>Type</TableCell>
-                <TableCell>Property ID</TableCell>
-                <TableCell>Operator</TableCell>
-                <TableCell>Status</TableCell>
-                <TableCell>Action</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {recentActivities.map((activity) => (
-                <TableRow key={activity.id}>
-                  <TableCell>
-                    {formatDateTime(activity.timestamp)}
-                  </TableCell>
-                  <TableCell>
-                    {activity.type === 'RENEWAL' ? 'Renewal' : 'Transfer'}
-                  </TableCell>
-                  <TableCell>{activity.folioNumber}</TableCell>
-                  <TableCell>
-                    <AddressDisplay address={activity.agentAddress} />
-                  </TableCell>
-                  <TableCell>
-                    <StatusChip status={activity.status} />
-                  </TableCell>
-                  <TableCell>
-                    <Button
-                      size="small"
-                      onClick={() => navigate(`/admin/approvals/${activity.type.toLowerCase()}/${activity.id}`)}
-                    >
-                      View
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {recentActivities.length === 0 && (
-                <TableRow>
-                  <TableCell colSpan={6} align="center">
-                    No activities yet
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      </Box>
+        </DialogActions>
+      </Dialog>
     </Layout>
   );
 };
 
-export default Dashboard; 
+export default AdminDashboard; 

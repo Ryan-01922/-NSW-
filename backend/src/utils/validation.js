@@ -21,10 +21,15 @@ const validateEthAddress = (address) => {
  */
 const validateIPFSHash = (hash) => {
     if (!hash) return false;
-    // Basic validation for CIDv0 (Qm...) format
-    // For more comprehensive validation, consider using the 'cids' package
-    return typeof hash === 'string'
-        && /^Qm[a-zA-Z0-9]{44}$/.test(hash);
+    if (typeof hash !== 'string') return false;
+    
+    // CIDv0 format: Qm + 44 base58 characters (total 46 characters)
+    const cidv0Pattern = /^Qm[a-zA-Z0-9]{44}$/;
+    
+    // CIDv1 format: baf + variable length base32 characters
+    const cidv1Pattern = /^baf[a-z2-7]{50,}$/;
+    
+    return cidv0Pattern.test(hash) || cidv1Pattern.test(hash);
 };
 
 /**

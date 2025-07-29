@@ -1,29 +1,29 @@
 import { ethers } from 'ethers';
 
-// 合约地址
+// Contract addresses
 export const CONTRACT_ADDRESSES = {
-  LandRegistry: '0x...',  // 部署后填入实际地址
+  LandRegistry: '0x...',  // Fill in actual address after deployment
   RenewalApproval: '0x...',
   TransferApproval: '0x...',
 };
 
-// 合约ABI
+// Contract ABIs
 export const ABIS = {
   LandRegistry: [
-    // 从编译后的合约文件中复制
+    // Copy from compiled contract file
   ],
   RenewalApproval: [
-    // 从编译后的合约文件中复制
+    // Copy from compiled contract file
   ],
   TransferApproval: [
-    // 从编译后的合约文件中复制
+    // Copy from compiled contract file
   ],
 };
 
-// 获取合约实例
+// Get contract instance
 export const getContract = async (name) => {
   if (!window.ethereum) {
-    throw new Error('请安装MetaMask');
+    throw new Error('Please install MetaMask');
   }
 
   const provider = new ethers.BrowserProvider(window.ethereum);

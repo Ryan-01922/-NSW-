@@ -15,12 +15,12 @@ contract LandRegistry is AccessControl {
         bool active;
     }
 
-    // 主要存储
+    // Main storage
     mapping(string => Property) public properties;
     mapping(string => address) public pendingTransfers;
     mapping(string => address[]) public ownershipHistory;
 
-    // 事件定义
+    // Event definitions
     event PropertyRegistered(string folioNumber, address owner, string ipfsHash);
     event RenewalRequested(string folioNumber, address requester);
     event RenewalApproved(string folioNumber, uint256 newExpiryTime);
@@ -33,7 +33,7 @@ contract LandRegistry is AccessControl {
         _grantRole(ADMIN_ROLE, msg.sender);
     }
 
-    // 房产登记函数
+    // Property registration function
     function registerProperty(
         string memory folioNumber,
         address owner,
@@ -51,11 +51,13 @@ contract LandRegistry is AccessControl {
             active: true
         });
 
+        // Add to ownership history
         ownershipHistory[folioNumber].push(owner);
+        
         emit PropertyRegistered(folioNumber, owner, ipfsHash);
     }
 
-    // 续期请求函数
+    // Renewal request function
     function requestRenewal(string memory folioNumber) public onlyRole(AGENT_ROLE) {
         require(properties[folioNumber].owner != address(0), "Property not found");
         require(properties[folioNumber].active, "Property not active");
@@ -63,7 +65,7 @@ contract LandRegistry is AccessControl {
         emit RenewalRequested(folioNumber, msg.sender);
     }
 
-    // 管理员审批续期
+    // Admin approval for renewal
     function approveRenewal(string memory folioNumber, uint256 newExpiryTime) 
         public onlyRole(ADMIN_ROLE) 
     {
@@ -74,7 +76,7 @@ contract LandRegistry is AccessControl {
         emit RenewalApproved(folioNumber, newExpiryTime);
     }
 
-    // 转移请求函数
+    // Transfer request function
     function requestTransfer(string memory folioNumber, address newOwner) 
         public onlyRole(AGENT_ROLE) 
     {
@@ -87,7 +89,7 @@ contract LandRegistry is AccessControl {
         emit TransferRequested(folioNumber, properties[folioNumber].owner, newOwner);
     }
 
-    // 管理员审批转移
+    // Admin approval for transfer
     function approveTransfer(string memory folioNumber) public onlyRole(ADMIN_ROLE) {
         require(properties[folioNumber].owner != address(0), "Property not found");
         require(pendingTransfers[folioNumber] != address(0), "No pending transfer");
@@ -103,7 +105,7 @@ contract LandRegistry is AccessControl {
         emit TransferApproved(folioNumber, oldOwner, newOwner);
     }
 
-    // 更新房产状态
+    // Update property status
     function setPropertyStatus(string memory folioNumber, bool active) 
         public onlyRole(ADMIN_ROLE) 
     {
@@ -112,7 +114,7 @@ contract LandRegistry is AccessControl {
         emit PropertyStatusChanged(folioNumber, active);
     }
 
-    // 查询函数
+    // Query functions
     function getProperty(string memory folioNumber) public view returns (
         address owner,
         string memory ipfsHash,

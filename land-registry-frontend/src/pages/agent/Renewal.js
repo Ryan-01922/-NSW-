@@ -77,9 +77,17 @@ const Renewal = () => {
       setSubmitting(true);
       setError(null);
 
+      // Calculate new expiry date
+      const currentExpiry = new Date(selectedProperty.expiry_date);
+      const newExpiry = new Date(currentExpiry);
+      newExpiry.setFullYear(newExpiry.getFullYear() + Number(renewalPeriod));
+
       await agentAPI.createRenewal({
-        folioNumber: selectedProperty.folioNumber,
-        renewalPeriod: Number(renewalPeriod)
+        folioNumber: selectedProperty.folio_number,
+        requesterAddress: selectedProperty.owner_address,
+        newExpiryDate: newExpiry.toISOString(),
+        reason: `Property renewal extension for ${renewalPeriod} year(s)`,
+        documents: [] // Empty documents array for renewal request
       });
 
       setOpenDialog(false);
@@ -147,19 +155,19 @@ const Renewal = () => {
           <TableBody>
             {renewals.map((renewal) => (
               <TableRow key={renewal.id}>
-                <TableCell>{renewal.folioNumber}</TableCell>
+                <TableCell>{renewal.folio_number}</TableCell>
                 <TableCell>
-                  <AddressDisplay address={renewal.ownerAddress} />
+                  <AddressDisplay address={renewal.owner_address} />
                 </TableCell>
-                <TableCell>{renewal.renewalPeriod} years</TableCell>
+                <TableCell>{renewal.renewal_period} years</TableCell>
                 <TableCell>
-                  {formatDate(renewal.requestDate)}
+                  {formatDate(renewal.request_date)}
                 </TableCell>
                 <TableCell>
                   <StatusChip status={renewal.status} />
                 </TableCell>
                 <TableCell>
-                  {renewal.approvalDate ? formatDate(renewal.approvalDate) : '-'}
+                  {renewal.approval_date ? formatDate(renewal.approval_date) : '-'}
                 </TableCell>
                 <TableCell>{renewal.remarks || '-'}</TableCell>
                 <TableCell>
@@ -199,17 +207,17 @@ const Renewal = () => {
                 fullWidth
                 label="Select Property"
                 SelectProps={{ native: true }}
-                value={selectedProperty?.folioNumber || ''}
+                value={selectedProperty?.folio_number || ''}
                 onChange={(e) => {
-                  const property = properties.find(p => p.folioNumber === e.target.value);
+                  const property = properties.find(p => p.folio_number === e.target.value);
                   setSelectedProperty(property);
                 }}
                 disabled={submitting}
               >
-                <option value="">Please select</option>
+                <option value=""> </option>
                 {properties.map((property) => (
-                  <option key={property.folioNumber} value={property.folioNumber}>
-                    {property.folioNumber} - {property.location}
+                  <option key={property.folio_number} value={property.folio_number}>
+                    {property.folio_number} - {property.metadata?.location || property.location_hash}
                   </option>
                 ))}
               </TextField>
