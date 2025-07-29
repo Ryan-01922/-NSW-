@@ -17,17 +17,16 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
-  DialogContentText,
   DialogActions,
 } from '@mui/material';
 import {
   ArrowBack as ArrowBackIcon,
   History as HistoryIcon,
-  Person as PersonIcon,
 } from '@mui/icons-material';
 import Layout from '../../components/Layout';
+import AddressDisplay from '../../components/AddressDisplay';
 import { useAuth } from '../../contexts/AuthContext';
-import axios from 'axios';
+import { userAPI } from '../../services/api';
 
 const Property = () => {
   const { id } = useParams();
@@ -40,26 +39,20 @@ const Property = () => {
   const [error, setError] = useState(null);
   const [openHistory, setOpenHistory] = useState(false);
 
-  // 获取地产详情
+  // Fetch property details
   const fetchPropertyDetails = async () => {
     try {
       const [propertyRes, agentsRes, historyRes] = await Promise.all([
-        axios.get(`http://localhost:3001/api/properties/${id}`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` }
-        }),
-        axios.get(`http://localhost:3001/api/properties/${id}/agents`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` }
-        }),
-        axios.get(`http://localhost:3001/api/properties/${id}/history`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` }
-        })
+        userAPI.getProperty(id),
+        userAPI.getAuthorizedAgents(id),
+        userAPI.getPropertyHistory(id)
       ]);
 
-      setProperty(propertyRes.data);
-      setAgents(agentsRes.data);
-      setHistory(historyRes.data);
+      setProperty(propertyRes);
+      setAgents(agentsRes);
+      setHistory(historyRes.history || []);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Failed to fetch property details');
     } finally {
       setLoading(false);
     }
@@ -69,16 +62,14 @@ const Property = () => {
     fetchPropertyDetails();
   }, [id]);
 
-  // 撤销代理人授权
+  // Revoke agent authorization
   const handleRevokeAgent = async (agentAddress) => {
     try {
-      await axios.delete(`http://localhost:3001/api/properties/${id}/agents/${agentAddress}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('auth_token')}` }
-      });
-      // 刷新代理人列表
+      await userAPI.revokeAgent(id, agentAddress);
+      // Refresh agent list
       fetchPropertyDetails();
     } catch (err) {
-      setError(err.message);
+      setError(err.message || 'Failed to revoke authorization');
     }
   };
 
@@ -95,164 +86,269 @@ const Property = () => {
   if (error) {
     return (
       <Layout>
-        <Typography color="error">{error}</Typography>
+        <Box sx={{ p: 3 }}>
+          <Typography color="error">{error}</Typography>
+          <Button 
+            variant="outlined" 
+            onClick={() => navigate('/user')} 
+            sx={{ mt: 2 }}
+            startIcon={<ArrowBackIcon />}
+          >
+            Back to Dashboard
+          </Button>
+        </Box>
       </Layout>
     );
   }
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'ACTIVE':
-        return 'success';
-      case 'PENDING_RENEWAL':
-        return 'warning';
-      case 'EXPIRED':
-        return 'error';
-      default:
-        return 'default';
-    }
-  };
-
-  const getStatusText = (status) => {
-    switch (status) {
-      case 'ACTIVE':
-        return '有效';
-      case 'PENDING_RENEWAL':
-        return '待续期';
-      case 'EXPIRED':
-        return '已过期';
-      default:
-        return '未知';
-    }
-  };
+  if (!property) {
+    return (
+      <Layout>
+        <Box sx={{ p: 3 }}>
+          <Typography>Property not found</Typography>
+          <Button 
+            variant="outlined" 
+            onClick={() => navigate('/user')} 
+            sx={{ mt: 2 }}
+            startIcon={<ArrowBackIcon />}
+          >
+            Back to Dashboard
+          </Button>
+        </Box>
+      </Layout>
+    );
+  }
 
   return (
     <Layout>
-      <Box sx={{ mb: 4 }}>
-        <Button
-          startIcon={<ArrowBackIcon />}
+      <Box sx={{ mb: 3 }}>
+        <Button 
+          variant="outlined" 
           onClick={() => navigate('/user')}
+          startIcon={<ArrowBackIcon />}
           sx={{ mb: 2 }}
         >
-          返回
+          Back to Properties
         </Button>
+        
         <Typography variant="h4" gutterBottom>
-          地产详情
+          Property Details
         </Typography>
       </Box>
 
       <Grid container spacing={3}>
-        {/* 基本信息 */}
+        {/* Property Information */}
         <Grid item xs={12} md={8}>
           <Card>
             <CardContent>
               <Typography variant="h6" gutterBottom>
-                基本信息
+                Property Information
               </Typography>
+              
               <Grid container spacing={2}>
                 <Grid item xs={12} sm={6}>
-                  <Typography color="textSecondary">地产编号</Typography>
-                  <Typography variant="body1">{property.folioNumber}</Typography>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography color="textSecondary">状态</Typography>
-                  <Chip
-                    label={getStatusText(property.status)}
-                    color={getStatusColor(property.status)}
-                    size="small"
-                  />
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography color="textSecondary">所有者地址</Typography>
-                  <Typography variant="body1">{property.ownerAddress}</Typography>
-                </Grid>
-                <Grid item xs={12} sm={6}>
-                  <Typography color="textSecondary">到期时间</Typography>
-                  <Typography variant="body1">
-                    {new Date(property.expiryDate).toLocaleDateString()}
+                  <Typography variant="body2" color="text.secondary">
+                    Folio Number
+                  </Typography>
+                  <Typography variant="body1" sx={{ mb: 2 }}>
+                    {property.folio_number}
                   </Typography>
                 </Grid>
+                
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="body2" color="text.secondary">
+                    Status
+                  </Typography>
+                  <Box sx={{ mb: 2 }}>
+                    <Chip 
+                      label={property.status} 
+                      color={property.status === 'active' ? 'success' : 'default'}
+                      size="small"
+                    />
+                  </Box>
+                </Grid>
+                
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="body2" color="text.secondary">
+                    Area Size
+                  </Typography>
+                  <Typography variant="body1" sx={{ mb: 2 }}>
+                    {property.area_size} m²
+                  </Typography>
+                </Grid>
+                
+                <Grid item xs={12} sm={6}>
+                  <Typography variant="body2" color="text.secondary">
+                    Expiry Date
+                  </Typography>
+                  <Typography variant="body1" sx={{ mb: 2 }}>
+                    {new Date(property.expiry_date).toLocaleDateString()}
+                  </Typography>
+                </Grid>
+                
                 <Grid item xs={12}>
-                  <Typography color="textSecondary">地址</Typography>
-                  <Typography variant="body1">{property.location}</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Owner Address
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontFamily: 'monospace', mb: 2 }}>
+                    {property.owner_address}
+                  </Typography>
+                </Grid>
+                
+                <Grid item xs={12}>
+                  <Typography variant="body2" color="text.secondary">
+                    Location Hash
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontFamily: 'monospace', mb: 2 }}>
+                    {property.location_hash}
+                  </Typography>
+                </Grid>
+                
+                <Grid item xs={12}>
+                  <Typography variant="body2" color="text.secondary">
+                    IPFS Hash
+                  </Typography>
+                  <Typography variant="body1" sx={{ fontFamily: 'monospace' }}>
+                    {property.ipfs_hash}
+                  </Typography>
                 </Grid>
               </Grid>
             </CardContent>
           </Card>
         </Grid>
 
-        {/* 代理人列表 */}
+        {/* Authorized Agents */}
         <Grid item xs={12} md={4}>
-          <Paper>
-            <Box sx={{ p: 2 }}>
+          <Card>
+            <CardContent>
               <Typography variant="h6" gutterBottom>
-                授权代理人
+                Authorized Agents
               </Typography>
-              <List>
-                {agents.map((agent) => (
-                  <ListItem
-                    key={agent.address}
-                    secondaryAction={
+              
+              {agents.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  No agents authorized
+                </Typography>
+              ) : (
+                <List dense>
+                  {agents.map((agent, index) => (
+                    <ListItem key={index} divider={index < agents.length - 1}>
+                      <ListItemText
+                        primary={
+                          <Typography variant="body2" sx={{ fontFamily: 'monospace' }}>
+                            {agent.agent_address.slice(0, 6)}...{agent.agent_address.slice(-4)}
+                          </Typography>
+                        }
+                        secondary={`Authorized: ${new Date(agent.created_at).toLocaleDateString()}`}
+                      />
                       <Button
-                        color="error"
                         size="small"
-                        onClick={() => handleRevokeAgent(agent.address)}
+                        color="error"
+                        onClick={() => handleRevokeAgent(agent.agent_address)}
                       >
-                        撤销
+                        Revoke
                       </Button>
-                    }
-                  >
-                    <ListItemText
-                      primary={agent.address}
-                      secondary={`授权时间: ${new Date(agent.authorizedAt).toLocaleDateString()}`}
-                    />
-                  </ListItem>
-                ))}
-              </List>
-            </Box>
-          </Paper>
-        </Grid>
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </CardContent>
+          </Card>
 
-        {/* 操作按钮 */}
-        <Grid item xs={12}>
-          <Box sx={{ mt: 2 }}>
-            <Button
-              variant="outlined"
-              startIcon={<HistoryIcon />}
-              onClick={() => setOpenHistory(true)}
-              sx={{ mr: 2 }}
-            >
-              查看历史记录
-            </Button>
-          </Box>
+          {/* History Button */}
+          <Card sx={{ mt: 2 }}>
+            <CardContent>
+              <Button
+                fullWidth
+                variant="outlined"
+                startIcon={<HistoryIcon />}
+                onClick={() => setOpenHistory(true)}
+              >
+                View History
+              </Button>
+            </CardContent>
+          </Card>
         </Grid>
       </Grid>
 
-      {/* 历史记录对话框 */}
-      <Dialog
-        open={openHistory}
+      {/* History Dialog */}
+      <Dialog 
+        open={openHistory} 
         onClose={() => setOpenHistory(false)}
         maxWidth="md"
         fullWidth
       >
-        <DialogTitle>操作历史</DialogTitle>
+        <DialogTitle>Property History</DialogTitle>
         <DialogContent>
-          <List>
-            {history.map((record, index) => (
-              <React.Fragment key={record.id}>
-                <ListItem>
+          {history.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              No history records found
+            </Typography>
+          ) : (
+            <List>
+              {history.map((record, index) => (
+                <ListItem key={index} divider={index < history.length - 1}>
                   <ListItemText
-                    primary={record.action}
-                    secondary={`${new Date(record.timestamp).toLocaleString()} - ${record.details}`}
+                    primary={
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="body1">
+                          {record.type === 'TRANSFER' ? 'Property Ownership Transfer' : 
+                           record.type === 'RENEWAL' ? 'Property Renewal' : record.type} - {record.status}
+                        </Typography>
+                        <Chip 
+                          label={record.status} 
+                          size="small"
+                          color={record.status === 'approved' ? 'success' : 
+                                record.status === 'rejected' ? 'error' : 'default'}
+                        />
+                      </Box>
+                    }
+                    secondary={
+                      <>
+                        <Typography variant="body2" color="text.secondary">
+                          Date: {new Date(record.timestamp).toLocaleString()}
+                        </Typography>
+                        {record.type === 'TRANSFER' && record.from_address && record.to_address && (
+                          <Box sx={{ mt: 1, mb: 1 }}>
+                             <Typography variant="body2" color="text.secondary">
+                               From (Seller): 
+                             </Typography>
+                             <Box sx={{ ml: 1, mb: 0.5 }}>
+                               <AddressDisplay address={record.from_address} />
+                             </Box>
+                             <Typography variant="body2" color="text.secondary">
+                               To (Buyer): 
+                             </Typography>
+                            <Box sx={{ ml: 1 }}>
+                              <AddressDisplay address={record.to_address} />
+                            </Box>
+                          </Box>
+                        )}
+                        {record.type === 'RENEWAL' && record.actor_address && (
+                          <Box sx={{ mt: 1, mb: 1 }}>
+                            <Typography variant="body2" color="text.secondary">
+                              Requested by: 
+                            </Typography>
+                            <Box sx={{ ml: 1 }}>
+                              <AddressDisplay address={record.actor_address} />
+                            </Box>
+                          </Box>
+                        )}
+                        {record.remarks && (
+                          <Typography variant="body2" color="text.secondary">
+                            Remarks: {record.remarks}
+                          </Typography>
+                        )}
+                      </>
+                    }
                   />
                 </ListItem>
-                {index < history.length - 1 && <Divider />}
-              </React.Fragment>
-            ))}
-          </List>
+              ))}
+            </List>
+          )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpenHistory(false)}>关闭</Button>
+          <Button onClick={() => setOpenHistory(false)}>Close</Button>
         </DialogActions>
       </Dialog>
     </Layout>

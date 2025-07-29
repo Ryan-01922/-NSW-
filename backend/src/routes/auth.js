@@ -33,7 +33,11 @@ router.post('/', async (req, res) => {
         const agentResult = await pool.query(`
             SELECT DISTINCT agent_address 
             FROM agent_authorization 
-            WHERE agent_address = $1 AND is_active = true
+            WHERE LOWER(agent_address) = LOWER($1) AND is_active = true
+            UNION
+            SELECT agent_address
+            FROM global_agents
+            WHERE LOWER(agent_address) = LOWER($1) AND is_active = true
         `, [address]);
         if (agentResult.rows.length > 0) {
             roles.push('AGENT');

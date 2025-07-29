@@ -5,7 +5,7 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3001';
 // Create axios instance
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 90000, // Increased to 90 seconds for blockchain transactions
 });
 
 // Request interceptor
@@ -47,37 +47,39 @@ export const authAPI = {
 // User related
 export const userAPI = {
   // Get user's property list
-  getProperties: () => api.get('/api/properties/user'),
+  getProperties: () => api.get('/api/user/properties'),
   // Get single property details
-  getProperty: (id) => api.get(`/api/properties/${id}`),
+  getProperty: (id) => api.get(`/api/user/properties/${id}`),
   // Get property history
-  getPropertyHistory: (id) => api.get(`/api/properties/${id}/history`),
+  getPropertyHistory: (id) => api.get(`/api/user/properties/${id}/history`),
+  // Get transfer requests involving user
+  getTransfers: () => api.get('/api/user/transfers'),
   // Authorize agent
-  authorizeAgent: (data) => api.post('/api/properties/authorize', data),
+  authorizeAgent: (propertyId, data) => api.post(`/api/user/properties/${propertyId}/agents`, data),
   // Revoke agent authorization
   revokeAgent: (propertyId, agentAddress) => 
-    api.delete(`/api/properties/${propertyId}/agents/${agentAddress}`),
+    api.delete(`/api/user/properties/${propertyId}/agents/${agentAddress}`),
   // Get authorized agents list
   getAuthorizedAgents: (propertyId) => 
-    api.get(`/api/properties/${propertyId}/agents`),
+    api.get(`/api/user/properties/${propertyId}/agents`),
 };
 
 // Agent related
 export const agentAPI = {
   // Get agent's property list
-  getProperties: () => api.get('/api/properties/agent'),
+  getProperties: () => api.get('/api/agent/properties'),
   // Register new property
   registerProperty: (data) => api.post('/api/properties', data),
   // Get renewal request list
-  getRenewals: () => api.get('/api/renewals/agent'),
+  getRenewals: () => api.get('/api/agent/renewals'),
   // Get single renewal request details
-  getRenewal: (id) => api.get(`/api/renewals/${id}`),
+  getRenewal: (id) => api.get(`/api/agent/renewals/${id}`),
   // Create renewal request
-  createRenewal: (data) => api.post('/api/renewals', data),
+  createRenewal: (data) => api.post('/api/agent/renewals', data),
   // Cancel renewal request
   cancelRenewal: (id) => api.delete(`/api/renewals/${id}`),
   // Get transfer request list
-  getTransfers: () => api.get('/api/transfers/agent'),
+  getTransfers: () => api.get('/api/agent/transfers'),
   // Get single transfer request details
   getTransfer: (id) => api.get(`/api/transfers/${id}`),
   // Create transfer request
@@ -90,39 +92,62 @@ export const agentAPI = {
 export const adminAPI = {
   // Get system statistics
   getStats: () => api.get('/api/admin/stats'),
-  // Get system activities
+  // Get recent activities
   getActivities: () => api.get('/api/admin/activities'),
-  // Get pending renewal requests
+  // Get pending renewals
   getPendingRenewals: () => api.get('/api/admin/renewals/pending'),
-  // Get pending transfer requests
+  // Get pending transfers
   getPendingTransfers: () => api.get('/api/admin/transfers/pending'),
-  // Get single renewal request details
-  getRenewal: (id) => api.get(`/api/admin/renewals/${id}`),
-  // Get single transfer request details
-  getTransfer: (id) => api.get(`/api/admin/transfers/${id}`),
-  // Handle renewal request
+  // Approve/reject renewal
   handleRenewal: (id, data) => api.post(`/api/admin/renewals/${id}/approve`, data),
-  // Handle transfer request
+  // Approve/reject transfer
   handleTransfer: (id, data) => api.post(`/api/admin/transfers/${id}/approve`, data),
-  // Get system logs
-  getLogs: (params) => api.get('/api/admin/logs', { params }),
-  // Get user list
-  getUsers: () => api.get('/api/admin/users'),
-  // Get agent list
+  // Agent management
+  authorizeAgent: (data) => api.post('/api/admin/agents', data),
   getAgents: () => api.get('/api/admin/agents'),
+  revokeAgent: (address) => api.delete(`/api/admin/agents/${address}`),
 };
 
 // IPFS related
 export const ipfsAPI = {
   // Upload file to IPFS
-  upload: (file) => {
+  upload: async (file) => {
+    try {
+      console.log('Uploading file to IPFS:', file.name);
     const formData = new FormData();
     formData.append('file', file);
-    return api.post('/api/ipfs/upload', formData, {
+      
+      const response = await api.post('/api/ipfs/upload', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
       },
     });
+      
+      console.log('IPFS upload response (after interceptor):', response);
+      
+      // Note: response interceptor already extracts .data, so response IS the data
+      const responseData = response;
+      
+      // Check if response has the expected structure
+      if (!responseData) {
+        throw new Error('No response data received from IPFS upload');
+      }
+      
+      if (!responseData.cid) {
+        console.error('Response data structure:', responseData);
+        throw new Error('No CID found in IPFS upload response');
+      }
+      
+      console.log('File uploaded successfully. CID:', responseData.cid);
+      
+      // Return the CID
+      return responseData.cid;
+      
+    } catch (error) {
+      console.error('Error uploading file to IPFS:', error);
+      console.error('Error response:', error.response?.data);
+      throw new Error(`Failed to upload file to IPFS: ${error.message}`);
+    }
   },
   // Get file from IPFS
   getFile: (cid) => api.get(`/api/ipfs/${cid}`),

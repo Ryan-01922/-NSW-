@@ -40,6 +40,7 @@ CREATE TABLE agent_authorization (
     agent_address VARCHAR(42) NOT NULL CHECK (agent_address ~ '^0x[a-fA-F0-9]{40}$'),
     owner_address VARCHAR(42) NOT NULL CHECK (owner_address ~ '^0x[a-fA-F0-9]{40}$'),
     folio_number VARCHAR(50) NOT NULL REFERENCES properties(folio_number) ON DELETE CASCADE,
+    authorized_by VARCHAR(42) NOT NULL CHECK (authorized_by ~ '^0x[a-fA-F0-9]{40}$'),
     authorized_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMP CHECK (expires_at > authorized_at),
     is_active BOOLEAN NOT NULL DEFAULT true,
@@ -48,6 +49,18 @@ CREATE TABLE agent_authorization (
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(agent_address, owner_address, folio_number),
     CHECK (agent_address != owner_address)
+);
+
+-- Create global_agents table for system-wide agent permissions
+CREATE TABLE global_agents (
+    id SERIAL PRIMARY KEY,
+    agent_address VARCHAR(42) NOT NULL UNIQUE CHECK (agent_address ~ '^0x[a-fA-F0-9]{40}$'),
+    authorized_by VARCHAR(42) NOT NULL CHECK (authorized_by ~ '^0x[a-fA-F0-9]{40}$'),
+    authorized_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    metadata JSONB,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Create renewal_requests table
@@ -87,6 +100,7 @@ CREATE INDEX idx_properties_status ON properties(status);
 CREATE INDEX idx_properties_expiry ON properties(expiry_date);
 CREATE INDEX idx_agent_auth_agent ON agent_authorization(agent_address) WHERE is_active = true;
 CREATE INDEX idx_agent_auth_owner ON agent_authorization(owner_address) WHERE is_active = true;
+CREATE INDEX idx_agent_auth_authorized_by ON agent_authorization(authorized_by);
 CREATE INDEX idx_renewal_folio ON renewal_requests(folio_number) WHERE status = 'pending';
 CREATE INDEX idx_renewal_status ON renewal_requests(status);
 CREATE INDEX idx_transfer_folio ON ownership_transfers(folio_number) WHERE status = 'pending';

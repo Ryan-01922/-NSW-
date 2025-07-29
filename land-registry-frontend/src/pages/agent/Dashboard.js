@@ -174,28 +174,28 @@ const Dashboard = () => {
       {/* Content Area */}
       <Grid container spacing={3}>
         {tab === 0 && properties.map((property) => (
-          <Grid item xs={12} sm={6} md={4} key={property.folioNumber}>
+          <Grid item xs={12} sm={6} md={4} key={property.folio_number}>
             <Card>
               <CardContent>
                 <Typography variant="h6" gutterBottom>
-                  {property.name || `Property ${property.folioNumber}`}
+                  {property.name || `Property ${property.folio_number}`}
                 </Typography>
                 <Typography color="textSecondary" gutterBottom>
-                  ID: {property.folioNumber}
+                  ID: {property.folio_number}
                 </Typography>
                 <Box sx={{ mt: 2, mb: 1 }}>
                   <StatusChip status={property.status} />
                 </Box>
                 <Typography variant="body2" gutterBottom>
-                  Owner: <AddressDisplay address={property.ownerAddress} />
+                  Owner: <AddressDisplay address={property.owner_address} />
                 </Typography>
                 <Typography variant="body2" sx={{ mb: 2 }}>
-                  Expiry Date: {formatDate(property.expiryDate)}
+                  Expiry Date: {formatDate(property.expiry_date)}
                 </Typography>
                 <Button
                   variant="outlined"
                   fullWidth
-                  onClick={() => navigate(`/agent/property/${property.folioNumber}`)}
+                  onClick={() => navigate(`/agent/property/${property.folio_number}`)}
                 >
                   Manage
                 </Button>
@@ -212,16 +212,16 @@ const Dashboard = () => {
                   Renewal Request #{renewal.id}
                 </Typography>
                 <Typography color="textSecondary" gutterBottom>
-                  Property ID: {renewal.folioNumber}
+                  Property ID: {renewal.folio_number}
                 </Typography>
                 <Box sx={{ mt: 2, mb: 1 }}>
                   <StatusChip status={renewal.status} />
                 </Box>
                 <Typography variant="body2" gutterBottom>
-                  Owner: <AddressDisplay address={renewal.ownerAddress} />
+                  Owner: <AddressDisplay address={renewal.owner_address} />
                 </Typography>
                 <Typography variant="body2" sx={{ mb: 2 }}>
-                  Request Date: {formatDate(renewal.requestDate)}
+                  New Expiry: {formatDate(renewal.new_expiry_date)}
                 </Typography>
                 <Button
                   variant="outlined"
@@ -243,19 +243,16 @@ const Dashboard = () => {
                   Transfer Request #{transfer.id}
                 </Typography>
                 <Typography color="textSecondary" gutterBottom>
-                  Property ID: {transfer.folioNumber}
+                  Property ID: {transfer.folio_number}
                 </Typography>
                 <Box sx={{ mt: 2, mb: 1 }}>
                   <StatusChip status={transfer.status} />
                 </Box>
                 <Typography variant="body2" gutterBottom>
-                  Current Owner: <AddressDisplay address={transfer.currentOwnerAddress} />
-                </Typography>
-                <Typography variant="body2" gutterBottom>
-                  New Owner: <AddressDisplay address={transfer.newOwnerAddress} />
+                  From: <AddressDisplay address={transfer.from_address} />
                 </Typography>
                 <Typography variant="body2" sx={{ mb: 2 }}>
-                  Request Date: {formatDate(transfer.requestDate)}
+                  To: <AddressDisplay address={transfer.to_address} />
                 </Typography>
                 <Button
                   variant="outlined"

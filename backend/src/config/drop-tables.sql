@@ -1,12 +1,14 @@
--- 设置客户端编码
+-- Set client encoding
 SET client_encoding = 'UTF8';
 
--- 删除表（按照依赖关系顺序）
+-- Drop tables in dependency order
 DROP TABLE IF EXISTS ownership_transfers CASCADE;
 DROP TABLE IF EXISTS renewal_requests CASCADE;
 DROP TABLE IF EXISTS agent_authorization CASCADE;
+DROP TABLE IF EXISTS global_agents CASCADE;
 DROP TABLE IF EXISTS properties CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
 
--- 删除自定义类型
+-- Drop custom types
 DROP TYPE IF EXISTS property_status CASCADE;
-DROP TYPE IF EXISTS request_status CASCADE; 
+DROP TYPE IF EXISTS transfer_status CASCADE; 

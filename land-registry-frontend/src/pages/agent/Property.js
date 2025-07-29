@@ -28,6 +28,7 @@ const Property = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+  const [progressMessage, setProgressMessage] = useState('');
 
   // Form data
   const [formData, setFormData] = useState({
@@ -101,30 +102,58 @@ const Property = () => {
     try {
       setLoading(true);
       setError(null);
+      setProgressMessage('');
 
-      // 1. Upload files to IPFS
+      // Step 1: Upload files to IPFS
+      setProgressMessage("Uploading documents to IPFS...");
       const [deedCID, surveyCID, photosCIDs] = await Promise.all([
         ipfsAPI.upload(files.deed),
         ipfsAPI.upload(files.survey),
         Promise.all(files.photos.map(photo => ipfsAPI.upload(photo)))
       ]);
 
-      // 2. Register property
+      // Step 2: Register property on blockchain
+      setProgressMessage("Registering property on blockchain...");
+      
+      // Calculate expiry date (default to 1 year from now)
+      const expiryDate = new Date();
+      expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+      
+      // Prepare documents array for backend
+      const documentsArray = [
+        { name: files.deed.name, type: 'deed', cid: deedCID },
+        { name: files.survey.name, type: 'survey', cid: surveyCID },
+        ...files.photos.map((photo, index) => ({
+          name: photo.name, 
+          type: 'document', 
+          cid: photosCIDs[index]
+        }))
+      ];
+      
       await agentAPI.registerProperty({
-        ...formData,
-        documents: {
-          deed: deedCID,
-          survey: surveyCID,
-          photos: photosCIDs,
+        folioNumber: formData.folioNumber,
+        locationHash: formData.location, // Convert location text to locationHash
+        areaSize: parseInt(formData.area), // Convert to number and rename
+        ownerAddress: formData.ownerAddress,
+        expiryDate: expiryDate.toISOString(),
+        documents: documentsArray,
+        metadata: {
+          propertyType: formData.propertyType,
+          description: formData.description,
+          location: formData.location
         }
       });
 
+      // Step 3: Success
+      setProgressMessage("Registration completed successfully!");
       setSuccess(true);
       setTimeout(() => {
         navigate('/agent');
-      }, 2000);
+      }, 3000);
     } catch (err) {
-      setError(err.message || 'Failed to register property');
+      console.error('Registration failed:', err);
+      setProgressMessage('');
+      setError(err.response?.data?.error || err.message || 'Failed to register property. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -154,8 +183,13 @@ const Property = () => {
                 name="folioNumber"
                 value={formData.folioNumber}
                 onChange={handleInputChange}
+                placeholder="NSW-SYD-2025-001"
                 error={formData.folioNumber && !isValidFolioNumber(formData.folioNumber)}
-                helperText={formData.folioNumber && !isValidFolioNumber(formData.folioNumber) ? 'Please enter a valid property ID' : ''}
+                helperText={
+                  formData.folioNumber && !isValidFolioNumber(formData.folioNumber) 
+                    ? 'Format: NSW-XXX-YYYY-NNN (e.g., NSW-SYD-2025-001)' 
+                    : 'Format: NSW-XXX-YYYY-NNN'
+                }
                 required
               />
             </Grid>
@@ -180,7 +214,7 @@ const Property = () => {
                 SelectProps={{ native: true }}
                 required
               >
-                <option value="">Please select</option>
+                <option value=""> </option>
                 <option value="RESIDENTIAL">Residential</option>
                 <option value="COMMERCIAL">Commercial</option>
                 <option value="INDUSTRIAL">Industrial</option>
@@ -217,26 +251,65 @@ const Property = () => {
         return (
           <Grid container spacing={3}>
             <Grid item xs={12}>
+              <Typography variant="h6" gutterBottom>
+                Upload Required Documents
+              </Typography>
+              <Typography variant="body2" color="textSecondary" sx={{ mb: 2 }}>
+                Please upload all required documents. All files must be in PDF format.
+              </Typography>
+            </Grid>
+            <Grid item xs={12}>
               <FileUpload
                 accept="application/pdf"
-                label="Upload Deed"
+                label={files.deed ? "✓ Deed Uploaded - Upload New" : "Upload Deed (Required)"}
                 onUpload={(file) => setFiles(prev => ({ ...prev, deed: file }))}
               />
+              {files.deed && (
+                <Typography variant="body2" color="success.main" sx={{ mt: 1 }}>
+                  ✓ Deed document ready: {files.deed.name}
+                </Typography>
+              )}
             </Grid>
             <Grid item xs={12}>
               <FileUpload
                 accept="application/pdf"
-                label="Upload Survey Report"
+                label={files.survey ? "✓ Survey Uploaded - Upload New" : "Upload Survey Report (Required)"}
                 onUpload={(file) => setFiles(prev => ({ ...prev, survey: file }))}
               />
+              {files.survey && (
+                <Typography variant="body2" color="success.main" sx={{ mt: 1 }}>
+                  ✓ Survey report ready: {files.survey.name}
+                </Typography>
+              )}
             </Grid>
             <Grid item xs={12}>
               <FileUpload
-                accept="image/*"
-                label="Upload Property Photos"
+                accept="application/pdf"
+                label={files.photos.length > 0 ? `✓ ${files.photos.length} Documents Uploaded - Upload More` : "Upload Property Documents (Required)"}
                 multiple
-                onUpload={(files) => setFiles(prev => ({ ...prev, photos: files }))}
+                onUpload={(fileArray) => setFiles(prev => ({ ...prev, photos: Array.isArray(fileArray) ? fileArray : [fileArray] }))}
               />
+              {files.photos.length > 0 && (
+                <Typography variant="body2" color="success.main" sx={{ mt: 1 }}>
+                  ✓ {files.photos.length} document(s) ready: {files.photos.map(f => f.name).join(', ')}
+                </Typography>
+              )}
+            </Grid>
+            <Grid item xs={12}>
+              <Alert severity="info" sx={{ mt: 2 }}>
+                <Typography variant="body2">
+                  <strong>Upload Requirements:</strong>
+                </Typography>
+                <Typography variant="body2">
+                  • Deed and Survey: PDF format, max 10MB each
+                </Typography>
+                <Typography variant="body2">
+                  • Property Documents: PDF format, max 10MB each
+                </Typography>
+                <Typography variant="body2">
+                  • All documents will be stored securely on IPFS
+                </Typography>
+              </Alert>
             </Grid>
           </Grid>
         );
@@ -290,7 +363,7 @@ const Property = () => {
                       Survey Report: {files.survey?.name || 'Not uploaded'}
                     </Typography>
                     <Typography>
-                      Property Photos: {files.photos.length} photos
+                      Property Documents: {files.photos.length} document(s)
                     </Typography>
                   </Grid>
                 </Grid>
@@ -334,6 +407,15 @@ const Property = () => {
                 </Alert>
               )}
 
+              {progressMessage && loading && (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                    <CircularProgress size={20} sx={{ mr: 1 }} />
+                    {progressMessage}
+                  </Box>
+                </Alert>
+              )}
+
               {renderStepContent(activeStep)}
 
               <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
@@ -355,7 +437,7 @@ const Property = () => {
                     {loading ? (
                       <>
                         <CircularProgress size={24} sx={{ mr: 1 }} />
-                        Submitting...
+                        {progressMessage || 'Submitting...'}
                       </>
                     ) : (
                       'Submit'

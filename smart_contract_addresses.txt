@@ -1,0 +1,188 @@
+NSW Land Registry System - Smart Contract Addresses
+===================================================
+
+NETWORK: Sepolia Testnet
+Chain ID: 11155111
+RPC URL: https://sepolia.infura.io/v3/YOUR_PROJECT_ID
+Block Explorer: https://sepolia.etherscan.io
+
+DEPLOYED CONTRACTS
+==================
+
+1. LAND REGISTRY CONTRACT
+-------------------------
+Contract Name: LandRegistry.sol
+Address: 0x6Fd59c5FDDe9b6bB3517d5F2d42297E5C53CD288
+Purpose: Main property management contract
+Functions: Property registration, ownership management, status tracking
+
+2. RENEWAL APPROVAL CONTRACT
+----------------------------
+Contract Name: RenewalApproval.sol
+Address: 0x817eB99666377dA34b1Dc70F21e1d231d8630D73
+Purpose: Property renewal request processing
+Functions: Renewal request creation, admin approval workflow
+
+3. TRANSFER APPROVAL CONTRACT
+----------------------------
+Contract Name: TransferApproval.sol
+Address: 0x88f3D1D20f4A0472aFCFE1b1F2CC2763ae1c85B2
+Purpose: Property ownership transfer processing
+Functions: Transfer request creation, admin approval workflow
+
+CONTRACT VERIFICATION
+====================
+
+Etherscan Verification Links:
+LandRegistry: https://sepolia.etherscan.io/address/0x6Fd59c5FDDe9b6bB3517d5F2d42297E5C53CD288
+RenewalApproval: https://sepolia.etherscan.io/address/0x817eB99666377dA34b1Dc70F21e1d231d8630D73
+TransferApproval: https://sepolia.etherscan.io/address/0x88f3D1D20f4A0472aFCFE1b1F2CC2763ae1c85B2
+
+CONFIGURATION FILES
+===================
+
+Backend Configuration (backend/src/config/contracts.js):
+------------------------------------------------------
+module.exports = {
+  LAND_REGISTRY_ADDRESS: '0x6Fd59c5FDDe9b6bB3517d5F2d42297E5C53CD288',
+  RENEWAL_APPROVAL_ADDRESS: '0x817eB99666377dA34b1Dc70F21e1d231d8630D73',
+  TRANSFER_APPROVAL_ADDRESS: '0x88f3D1D20f4A0472aFCFE1b1F2CC2763ae1c85B2',
+  NETWORK_ID: 11155111,
+  RPC_URL: 'https://sepolia.infura.io/v3/YOUR_PROJECT_ID'
+};
+
+Frontend Configuration (land-registry-frontend/src/contracts/index.js):
+---------------------------------------------------------------------
+export const CONTRACT_ADDRESSES = {
+  LAND_REGISTRY: '0x6Fd59c5FDDe9b6bB3517d5F2d42297E5C53CD288',
+  RENEWAL_APPROVAL: '0x817eB99666377dA34b1Dc70F21e1d231d8630D73',
+  TRANSFER_APPROVAL: '0x88f3D1D20f4A0472aFCFE1b1F2CC2763ae1c85B2'
+};
+
+CONTRACT ABIs
+============
+
+Contract ABIs are stored in backend/src/abis/:
+- LandRegistry.json
+- RenewalApproval.json
+- TransferApproval.json
+
+DEPLOYMENT NOTES
+===============
+
+Initial Setup:
+1. Deploy contracts using Hardhat
+2. Verify contracts on Etherscan
+3. Update configuration files
+4. Test contract interactions
+5. Update this document with actual addresses
+
+Security Considerations:
+- Keep private keys secure
+- Use multi-signature wallets for production
+- Regular security audits
+- Monitor contract events
+
+NETWORK CONFIGURATION
+====================
+
+Sepolia Testnet:
+- Chain ID: 11155111
+- RPC URL: https://sepolia.infura.io/v3/YOUR_PROJECT_ID
+- Block Explorer: https://sepolia.etherscan.io
+- Currency: Sepolia ETH
+
+Mainnet (Production):
+- Chain ID: 1
+- RPC URL: https://mainnet.infura.io/v3/YOUR_PROJECT_ID
+- Block Explorer: https://etherscan.io
+- Currency: ETH
+
+GAS OPTIMIZATION
+===============
+
+Contracts are optimized for gas efficiency:
+- Minimal storage operations
+- Efficient event emission
+- Batch operations where possible
+- Access control optimization
+
+EVENT MONITORING
+===============
+
+The backend monitors these contract events:
+- PropertyRegistered
+- RenewalRequested
+- RenewalApproved
+- TransferRequested
+- TransferApproved
+- PropertyStatusChanged
+
+UPGRADE STRATEGY
+================
+
+Current contracts are not upgradeable. For future upgrades:
+1. Deploy new contract versions
+2. Migrate data if necessary
+3. Update frontend and backend configurations
+4. Notify users of changes
+
+EMERGENCY PROCEDURES
+===================
+
+In case of contract issues:
+1. Pause operations if possible
+2. Contact development team
+3. Assess impact on users
+4. Plan migration strategy
+5. Communicate with stakeholders
+
+DEPLOYMENT COMMANDS
+==================
+
+Deploy to Sepolia:
+npx hardhat run scripts/deploy.js --network sepolia
+
+Verify on Etherscan:
+npx hardhat verify --network sepolia [CONTRACT_ADDRESS] [CONSTRUCTOR_ARGS]
+
+Test contracts:
+npx hardhat test
+
+Compile contracts:
+npx hardhat compile
+
+CONTRACT INTERACTIONS
+====================
+
+LandRegistry Functions:
+- registerProperty(folioNumber, owner, ipfsHash, expiryTimestamp)
+- requestRenewal(folioNumber)
+- approveRenewal(folioNumber, newExpiryTime)
+- requestTransfer(folioNumber, newOwner)
+- approveTransfer(folioNumber)
+
+RenewalApproval Functions:
+- createRenewalRequest(folioNumber, proposedExpiryTime)
+- approveRenewal(folioNumber)
+- rejectRenewal(folioNumber)
+
+TransferApproval Functions:
+- createTransferRequest(folioNumber, toAddress)
+- approveTransfer(folioNumber)
+- rejectTransfer(folioNumber)
+
+ROLE MANAGEMENT
+==============
+
+AGENT_ROLE: Can register properties, create renewal/transfer requests
+ADMIN_ROLE: Can approve/reject requests, manage system
+DEFAULT_ADMIN_ROLE: Can grant/revoke roles, upgrade contracts
+
+To grant roles:
+landRegistry.grantRole(AGENT_ROLE, agentAddress)
+landRegistry.grantRole(ADMIN_ROLE, adminAddress)
+
+To revoke roles:
+landRegistry.revokeRole(AGENT_ROLE, agentAddress)
+landRegistry.revokeRole(ADMIN_ROLE, adminAddress) 

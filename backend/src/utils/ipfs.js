@@ -1,11 +1,14 @@
-const { Web3Storage } = require('web3.storage');
+const { PinataSDK } = require('pinata');
 const { Buffer } = require('buffer');
 
-// Configure Web3.Storage client
-const client = new Web3Storage({ token: process.env.WEB3_STORAGE_TOKEN });
+// Configure Pinata client
+const client = new PinataSDK({
+    pinataJwt: process.env.PINATA_JWT,
+    pinataGateway: process.env.PINATA_GATEWAY
+});
 
 /**
- * Uploads a file or multiple files to IPFS using Web3.Storage
+ * Uploads a file or multiple files to IPFS using Pinata
  * @param {Array<Object>} files - Array of file objects with buffer and name
  * @returns {Promise<string>} - Returns the IPFS hash (CID) of the uploaded content
  */
@@ -15,53 +18,72 @@ const uploadToIPFS = async (files) => {
             throw new Error('No files provided');
         }
 
-        // Convert files to Web3.Storage format
-        const fileObjects = files.map(file => 
-            new File([file.buffer], file.name, { type: file.mimetype })
-        );
+        // If only one file, upload directly and return its CID
+        if (files.length === 1) {
+            const file = files[0];
+            const fileObject = new File([file.buffer], file.name, { type: file.mimetype });
+            
+            const upload = await client.upload.public.file(fileObject, {
+                metadata: {
+                    name: file.name,
+                    keyvalues: {
+                        uploadedBy: 'land-registry-system',
+                        uploadedAt: new Date().toISOString(),
+                        fileType: file.mimetype
+                    }
+                }
+            });
+            
+            return upload.cid;
+        }
 
-        // Upload to Web3.Storage
-        const cid = await client.put(fileObjects);
-        return cid;
+        // For multiple files, upload them and return the first file's CID
+        // (maintaining compatibility with existing code)
+        const uploads = [];
+        for (const file of files) {
+            const fileObject = new File([file.buffer], file.name, { type: file.mimetype });
+            
+            const upload = await client.upload.public.file(fileObject, {
+                metadata: {
+                    name: file.name,
+                    keyvalues: {
+                        uploadedBy: 'land-registry-system',
+                        uploadedAt: new Date().toISOString(),
+                        fileType: file.mimetype,
+                        fileIndex: uploads.length.toString()
+                    }
+                }
+            });
+            
+            uploads.push(upload.cid);
+        }
+
+        // Return the first CID for backwards compatibility
+        return uploads[0];
+        
     } catch (error) {
-        console.error('Error uploading to IPFS:', error);
-        throw new Error('Failed to upload to IPFS');
+        console.error('Error uploading to IPFS via Pinata:', error);
+        throw new Error('Failed to upload to IPFS: ' + error.message);
     }
 };
 
 /**
- * Retrieves content from IPFS using Web3.Storage
+ * Retrieves content from IPFS using Pinata Gateway
  * @param {string} cid - IPFS Content ID to retrieve
  * @returns {Promise<Buffer>} - Returns the content as a Buffer
  */
 const getFromIPFS = async (cid) => {
     try {
-        const res = await client.get(cid);
-        if (!res.ok) {
-            throw new Error(`Failed to get ${cid}`);
-        }
-
-        const files = await res.files();
-        const file = files[0];
-        const content = await file.arrayBuffer();
+        const response = await client.gateways.public.get(cid);
+        const content = await response.arrayBuffer();
         return Buffer.from(content);
     } catch (error) {
-        console.error('Error retrieving from IPFS:', error);
-        throw new Error('Failed to retrieve from IPFS');
+        console.error('Error retrieving from IPFS via Pinata:', error);
+        throw new Error('Failed to retrieve from IPFS: ' + error.message);
     }
-};
-
-/**
- * Generates a gateway URL for accessing IPFS content
- * @param {string} cid - IPFS Content ID
- * @returns {string} - Public gateway URL
- */
-const getIPFSGatewayURL = (cid) => {
-    return `https://w3s.link/ipfs/${cid}`;
 };
 
 module.exports = {
     uploadToIPFS,
-    getFromIPFS,
-    getIPFSGatewayURL
+    getFromIPFS
 }; 

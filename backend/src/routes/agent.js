@@ -7,15 +7,17 @@ const { ethers } = require('ethers');
 router.get('/properties', async (req, res) => {
     try {
         const address = req.user.address;
+        console.log('Agent requesting properties for address:', address);
 
         const result = await pool.query(`
             SELECT DISTINCT p.*
             FROM properties p
             JOIN agent_authorization a ON p.folio_number = a.folio_number
-            WHERE a.agent_address = $1 AND a.is_active = true
+            WHERE LOWER(a.agent_address) = LOWER($1) AND a.is_active = true
             ORDER BY p.updated_at DESC
         `, [address]);
 
+        console.log(`Found ${result.rows.length} properties for agent ${address}`);
         res.json(result.rows);
     } catch (error) {
         console.error('Failed to get properties:', error);
@@ -33,7 +35,7 @@ router.get('/renewals', async (req, res) => {
             FROM renewal_requests r
             JOIN properties p ON r.folio_number = p.folio_number
             JOIN agent_authorization a ON p.folio_number = a.folio_number
-            WHERE a.agent_address = $1 AND a.is_active = true
+            WHERE LOWER(a.agent_address) = LOWER($1) AND a.is_active = true
             ORDER BY r.created_at DESC
         `, [address]);
 
@@ -55,7 +57,7 @@ router.get('/renewals/:id', async (req, res) => {
             FROM renewal_requests r
             JOIN properties p ON r.folio_number = p.folio_number
             JOIN agent_authorization a ON p.folio_number = a.folio_number
-            WHERE r.id = $1 AND a.agent_address = $2 AND a.is_active = true
+            WHERE r.id = $1 AND LOWER(a.agent_address) = LOWER($2) AND a.is_active = true
         `, [id, address]);
 
         if (result.rows.length === 0) {
@@ -78,27 +80,30 @@ router.post('/renewals', async (req, res) => {
         // Verify authorization
         const auth = await pool.query(`
             SELECT * FROM agent_authorization
-            WHERE folio_number = $1 AND agent_address = $2 AND is_active = true
+            WHERE folio_number = $1 AND LOWER(agent_address) = LOWER($2) AND is_active = true
         `, [folioNumber, address]);
 
         if (auth.rows.length === 0) {
             return res.status(403).json({ error: 'Not authorized for this property' });
         }
 
-        // Create request
+        // Create request with auto-generated reason
+        const reason = `Property renewal extension for ${renewalPeriod} year(s)`;
         const result = await pool.query(`
             INSERT INTO renewal_requests (
                 folio_number,
                 requester_address,
                 new_expiry_date,
-                status
+                status,
+                reason
             ) VALUES (
                 $1,
                 $2,
                 CURRENT_TIMESTAMP + INTERVAL '1 year' * $3,
-                'pending'
+                'pending',
+                $4
             ) RETURNING *
-        `, [folioNumber, address, renewalPeriod]);
+        `, [folioNumber, address, renewalPeriod, reason]);
 
         res.json(result.rows[0]);
     } catch (error) {
@@ -117,7 +122,7 @@ router.get('/transfers', async (req, res) => {
             FROM ownership_transfers t
             JOIN properties p ON t.folio_number = p.folio_number
             JOIN agent_authorization a ON p.folio_number = a.folio_number
-            WHERE a.agent_address = $1 AND a.is_active = true
+            WHERE LOWER(a.agent_address) = LOWER($1) AND a.is_active = true
             ORDER BY t.created_at DESC
         `, [address]);
 
@@ -139,7 +144,7 @@ router.get('/transfers/:id', async (req, res) => {
             FROM ownership_transfers t
             JOIN properties p ON t.folio_number = p.folio_number
             JOIN agent_authorization a ON p.folio_number = a.folio_number
-            WHERE t.id = $1 AND a.agent_address = $2 AND a.is_active = true
+            WHERE t.id = $1 AND LOWER(a.agent_address) = LOWER($2) AND a.is_active = true
         `, [id, address]);
 
         if (result.rows.length === 0) {
@@ -163,7 +168,7 @@ router.post('/transfers', async (req, res) => {
         const auth = await pool.query(`
             SELECT p.owner_address FROM agent_authorization a
             JOIN properties p ON a.folio_number = p.folio_number
-            WHERE a.folio_number = $1 AND a.agent_address = $2 AND a.is_active = true
+            WHERE a.folio_number = $1 AND LOWER(a.agent_address) = LOWER($2) AND a.is_active = true
         `, [folioNumber, address]);
 
         if (auth.rows.length === 0) {
