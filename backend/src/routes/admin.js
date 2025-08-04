@@ -321,4 +321,46 @@ router.post('/transfers/:id/approve', async (req, res) => {
     }
 });
 
+// Get expired properties
+router.get('/expired-properties', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT folio_number, owner_address, expiry_date, status, created_at
+            FROM properties 
+            WHERE expiry_date < CURRENT_TIMESTAMP 
+            ORDER BY expiry_date ASC
+        `);
+        
+        res.json({
+            count: result.rows.length,
+            expired_properties: result.rows
+        });
+    } catch (error) {
+        console.error('Failed to get expired properties:', error);
+        res.status(500).json({ error: 'Failed to get expired properties' });
+    }
+});
+
+// Get properties expiring soon (within 30 days)
+router.get('/expiring-soon', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT folio_number, owner_address, expiry_date, status
+            FROM properties 
+            WHERE expiry_date BETWEEN CURRENT_TIMESTAMP 
+            AND CURRENT_TIMESTAMP + INTERVAL '30 days'
+            AND status = 'active'
+            ORDER BY expiry_date ASC
+        `);
+        
+        res.json({
+            count: result.rows.length,
+            expiring_soon: result.rows
+        });
+    } catch (error) {
+        console.error('Failed to get expiring properties:', error);
+        res.status(500).json({ error: 'Failed to get expiring properties' });
+    }
+});
+
 module.exports = router; 
