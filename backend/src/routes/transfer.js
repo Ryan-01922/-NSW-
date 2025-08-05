@@ -222,16 +222,10 @@ router.post('/', verifyToken, async (req, res) => {
             }
         ]);
 
-        // Deactivate all agent authorizations (new owner needs to authorize new agents)
+        // Delete all agent authorizations (new owner needs to authorize new agents from scratch)
         await client.query(`
-            UPDATE agent_authorization
-            SET is_active = false,
-                metadata = jsonb_set(
-                    COALESCE(metadata, '{}'::jsonb),
-                    '{deactivation_reason}',
-                    '"Property ownership transferred"'::jsonb
-                )
-            WHERE folio_number = $1 AND is_active = true
+            DELETE FROM agent_authorization
+            WHERE folio_number = $1
         `, [folioNumber]);
 
         // Execute transfer directly on blockchain (no approval needed)

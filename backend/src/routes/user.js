@@ -240,10 +240,9 @@ router.delete('/properties/:id/agents/:address', async (req, res) => {
             return res.status(403).json({ error: 'Not authorized to manage this property' });
         }
 
-        // Revoke authorization
+        // Delete authorization (hard delete)
         const result = await pool.query(`
-            UPDATE agent_authorization 
-            SET is_active = false, updated_at = CURRENT_TIMESTAMP
+            DELETE FROM agent_authorization 
             WHERE folio_number = $1 AND agent_address = $2 AND owner_address = $3 AND is_active = true
             RETURNING *
         `, [id, address, ownerAddress]);
@@ -252,7 +251,10 @@ router.delete('/properties/:id/agents/:address', async (req, res) => {
             return res.status(404).json({ error: 'Authorization not found' });
         }
 
-        res.json(result.rows[0]);
+        res.json({ 
+            message: 'Agent authorization removed successfully',
+            deletedAuthorization: result.rows[0] 
+        });
     } catch (error) {
         console.error('Failed to revoke authorization:', error);
         res.status(500).json({ error: 'Failed to revoke authorization' });

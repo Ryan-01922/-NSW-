@@ -16,6 +16,7 @@ const renewalRoutes = require('./routes/renewal');
 const transferRoutes = require('./routes/transfer');
 const ipfsRoutes = require('./routes/ipfs');
 const { startEventListeners } = require('./services/eventListener');
+const { pool } = require('./config/database');
 
 const app = express();
 const port = process.env.PORT || 3001;
@@ -63,6 +64,43 @@ app.use((req, res) => {
     res.status(404).json({ error: 'Resource not found' });
 });
 
+// Expiry checking function
+async function checkExpiredProperties() {
+    try {
+        const result = await pool.query(`
+            SELECT COUNT(*) as count 
+            FROM properties 
+            WHERE expiry_date < CURRENT_TIMESTAMP 
+            AND status = 'active'
+        `);
+        
+        const expiredCount = parseInt(result.rows[0].count);
+        if (expiredCount > 0) {
+            console.log(`WARNING: ${expiredCount} properties have expired!`);
+            
+            // Get details of expired properties
+            const expired = await pool.query(`
+                SELECT folio_number, owner_address, expiry_date 
+                FROM properties 
+                WHERE expiry_date < CURRENT_TIMESTAMP 
+                AND status = 'active'
+                ORDER BY expiry_date ASC
+                LIMIT 5
+            `);
+            
+            expired.rows.forEach(prop => {
+                console.log(`    ${prop.folio_number} expired on ${prop.expiry_date.toLocaleDateString()}`);
+            });
+            
+            if (expiredCount > 5) {
+                console.log(`   ... and ${expiredCount - 5} more properties`);
+            }
+        }
+    } catch (error) {
+        console.error('Error checking expired properties:', error);
+    }
+}
+
 // Start server
 app.listen(port, async () => {
     console.log(`Server running on port ${port}`);
@@ -72,8 +110,16 @@ app.listen(port, async () => {
         // Start event listener service
         await startEventListeners();
         console.log('Event listener service started');
+        
+        // Initial expiry check
+        await checkExpiredProperties();
+        
+        // Set up periodic expiry checking (every 24 hours)
+        setInterval(checkExpiredProperties, 24 * 60 * 60 * 1000);
+        console.log('Expiry monitoring started (checking every 24 hours)');
+        
     } catch (error) {
-        console.error('Failed to start event listener service:', error);
+        console.error('Failed to start services:', error);
         process.exit(1);
     }
 }); 
